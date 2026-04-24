@@ -387,6 +387,8 @@ def main():
     print("  cue        - Show random cue (for testing)")
     print("  cue X     - Get cue from category X")
     print("  trigger cue - Force cue, then type your message")
+    print("  model X   - Switch model (phi4, gemma4)")
+    print("  menu      - Show this commands menu")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
     print()
@@ -419,6 +421,46 @@ def main():
             print("=" * 50)
             print("    SEBASTIAN")
             print("=" * 50)
+            continue
+
+        if cmd == "menu":
+            print()
+            print("=" * 50)
+            print("    SEBASTIAN - Commands")
+            print("=" * 50)
+            print("  trigger    - Trigger proactive conversation")
+            print("  pause     - Pause auto-scheduler")
+            print("  resume    - Resume auto-scheduler")
+            print("  interval X - Set check interval to X minutes")
+            print("  status    - Show appointments status")
+            print("  clear-schedule - Clear scheduled appointments")
+            print("  clear-all  - Clear all data")
+            print("  memory status - Show memory statistics")
+            print("  medium memory - Load medium memory context")
+            print("  long memory  - Load long-term memory context")
+            print("  cue        - Show random cue (for testing)")
+            print("  cue X     - Get cue from category X")
+            print("  trigger cue - Force cue, then type your message")
+            print("  model X   - Switch model (phi4, gemma4)")
+            print("  menu      - Show this commands menu")
+            print("  clear     - Clear screen")
+            print("  quit      - Exit")
+            print()
+            continue
+
+        if cmd.startswith("model "):
+            new_model = cmd.split(" ", 1)[1].strip().lower()
+            # Map short names to full model names
+            model_map = {
+                "phi4": "phi4",
+                "gemma4": "gemma4:26b",
+            }
+            if new_model in model_map:
+                os.environ["COMPANION_MODEL"] = model_map[new_model]
+                print(f"[Switched to model: {new_model}]")
+            else:
+                available = ", ".join(model_map.keys())
+                print(f"[Unknown model: {new_model}] Available: {available}")
             continue
 
         if cmd == "status":
