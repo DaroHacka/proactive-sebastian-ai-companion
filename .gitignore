@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Data files (user-specific)
+*.json
+!interaction_intents.txt
+
+# Backups & logs
+backup/
+*.log
+sebastian.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+venv2/
+.ruff_cache/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific (runtime generated)
+memory/
+state.json
+last_interaction.json
+appointments.json
