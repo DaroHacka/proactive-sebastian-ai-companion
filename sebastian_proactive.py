@@ -343,7 +343,7 @@ def background_scheduler():
         # Check scheduler is enabled
         if sched_module.is_enabled():
             # Check for due appointments or random checks
-            check_and_trigger(auto_trigger_handler)
+            sched_module.check_and_trigger(auto_trigger_handler)
 
         # Sleep for configured interval (from .env or default 5 minutes)
         interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", 5))
