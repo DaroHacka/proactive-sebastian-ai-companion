@@ -363,6 +363,7 @@ def main():
     print("  long memory  - Load long-term memory context")
     print("  cue        - Show random cue (for testing)")
     print("  cue X     - Get cue from category X")
+    print("  trigger cue - Force cue, then type your message")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
     print()
@@ -433,6 +434,33 @@ def main():
         if cmd == "resume":
             sched_module.resume_scheduler(auto_trigger_handler)
             print("[Scheduler resumed]")
+            continue
+
+        if cmd == "trigger cue":
+            # Force cue then wait for user message
+            code, text, is_combo = get_random_cue(single_only=False)
+            combo_str = " (COMBO)" if is_combo else ""
+            print(f"\n[Cue ready: {code}]{combo_str}")
+            print(f"  {text}")
+            print("\nType your message...")
+            forced_cue = (code, text)
+            user_msg = input("\nYou: ").strip()
+            if user_msg:
+                # Send message with forced cue
+                system_instruction = {"role": "system", "content": f"{code}: {text}"}
+                merged_context = (
+                    _loaded_memory["medium"]
+                    + _loaded_memory["longterm"]
+                    + get_conversation_context()
+                )
+                messages = (
+                    [system_instruction]
+                    + merged_context
+                    + [{"role": "user", "content": user_msg}]
+                )
+                response = send_to_ollama_with_context(messages)
+                print(f"\nSebastian: {response}")
+                save_conversation(user_msg, response)
             continue
 
         if cmd.startswith("interval "):
