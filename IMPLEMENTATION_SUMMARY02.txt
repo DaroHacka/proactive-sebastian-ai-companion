@@ -1,0 +1,198 @@
+SEBASTIAN - PROACTIVE AI COMPANION (v2 - Appointment Cards)
+===================================================
+
+## Overview
+Sebastian is an AI companion that takes initiative to check on you by asking personal questions.
+He can remember conversations, extract appointment commitments from conversations, and schedule follow-ups.
+
+## Core Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Memory System | memory_manager.py | 3-tier conversation memory (fresh 10, medium 50, longterm) |
+| Appointments | appointments.py + appointments.json | Appointment card storage and scheduling |
+| Commitment Parser | commitment_parser.py | Extracts structured appointment cards from conversation |
+| WebUI Client | webui_client.py | LLM API integration + system prompt |
+| Main Loop | sebastian.py | Orchestrates all modes |
+
+## Appointment Card Structure
+
+```json
+{
+  "id": "appt_001",
+  "type": "commitment",
+  "created_at": "2025-01-20T15:30:00",
+  "expires_at": "2025-01-20T22:00:00",
+  "source": "ai_proposal" | "user_request",
+  "description": "Talk this evening around 8pm",
+  "due": "2025-01-20T20:00:00",
+  "status": "pending" | "completed" | "cancelled"
+}
+```
+
+## How It Works
+
+### Three Interaction Modes
+
+| Mode | Command | Trigger |
+|------|---------|---------|
+| **Conversation** | `python sebastian.py conversation "message"` | User initiates chat |
+| **Inactivity Check** | `python sebastian.py inactivity` | 30 min after last interaction |
+| **Proactive Check** | `python sebastian.py` | Cron job / timer |
+
+### Flow: Conversation Mode
+
+```
+User sends message
+        ↓
+sebastian.py sends to phi4 via Open WebUI
+        ↓
+phi4 responds (system prompt includes: "SOMETIMES suggest appointment")
+        ↓
+commitment_parser extracts any commitment from response
+        ↓
+create_appointment() saves to appointments.json
+        ↓
+add_memory() saves conversation to memory/
+        ↓
+Return response to user
+```
+
+### Flow: Inactivity Check (30 min)
+
+```
+Check triggered after 30 min inactivity
+        ↓
+parse_conversation_for_appointments()
+        ↓
+Sends prompt to phi4:
+"Did either you or the user mention a specific time for next conversation?"
+        ↓
+phi4 analyzes recent messages + response
+        ↓
+Outputs JSON appointment card if commitment found
+        ↓
+create_appointment() saves to appointments.json
+        ↓
+If no appointment: schedule_random_check()
+```
+
+### Flow: Proactive Check (via cron)
+
+```
+Script runs (every hour via cron)
+        ↓
+Check pending appointments → if due, send message
+        ↓
+Check random interval (2-24 hours) → if due, send random check
+        ↓
+Otherwise: worry-level escalation
+```
+
+## System Prompt (webui_client.py)
+
+```python
+COMPANION_SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias.
+
+You are a caring friend who checks in on him from time to time.
+You speak naturally as an old friend would - never mention you are an AI.
+
+CONVERSATION STYLE:
+- Keep responses short and conversational
+- Be warm but not overly enthusiastic
+- Listen actively and remember details he shares
+
+APPOINTMENTS:
+- SOMETIMES you may suggest scheduling a check-in: "Let's talk again tomorrow evening"
+- When you propose an appointment, acknowledge it will be tracked
+- Not every conversation needs an appointment - use judgment"""
+```
+
+## Commitment Parser (commitment_parser.py)
+
+The AI extracts structured JSON:
+
+```json
+{
+  "has_commitment": true,
+  "source": "ai_proposal" | "user_request",
+  "commitment_type": "today" | "tonight" | "tomorrow" | "hours" | "specific_time",
+  "hours_value": 2,
+  "specific_time": "20:00",
+  "natural_text": "I'll check in on you this evening",
+  "description": "Check in this evening"
+}
+```
+
+## Configuration (.env)
+
+```
+# Open WebUI API
+WEBUI_API_URL=http://localhost:3000/api
+API_KEY=your_api_key
+
+# Models
+COMPANION_MODEL=phi4
+AGENT_MODEL=qwen3:14b
+
+# Email
+EMAIL_ADDRESS=your_email@gmail.com
+EMAIL_PASSWORD=app_password
+USER_EMAIL=your_personal_email
+
+# Settings
+APPOINTMENTS_FILE=appointments.json
+INACTIVITY_CHECK_MINUTES=30
+WORRY_THRESHOLD_HOURS=3
+```
+
+## Running Sebastian
+
+### 1. Conversation Mode
+```bash
+python sebastian.py conversation "Hey, how are you today?"
+```
+
+### 2. Inactivity Check (30 min after conversation)
+```bash
+python sebastian.py inactivity
+```
+
+### 3. Proactive Check (via cron - every hour)
+```bash
+* * * * * /usr/bin/python3 /home/daniel/AI/sebastian.py >> /home/daniel/AI/sebastian.log 2>&1
+```
+
+## Dependencies
+
+```
+pip install python-dotenv requests
+```
+
+## Dependencies Not Yet Implemented
+
+- File system access (MCP) - Requires working MCP server with Open WebUI
+- Open Terminal - Container setup needed
+- Long-term memory via Open WebUI Knowledge Base
+
+## Notes
+
+- The appointment check happens on the SAME conversation session (via memory)
+- After 30 min inactivity, script asks AI to analyze for any time commitments
+- Both AI proposals and user requests are tracked
+- Random check intervals: [2, 3, 4, 5, 6, 7, 8, 12, 24] hours
+
+## Files Created/Modified (v2)
+
+| File | Status |
+|------|--------|
+| appointments.json | NEW |
+| appointments.py | NEW |
+| commitment_parser.py | UPDATED |
+| webui_client.py | UPDATED |
+| sebastian.py | UPDATED |
+| memory_manager.py | UNCHANGED |
+| intent_manager.py | UNCHANGED |
+| email_client.py | UNCHANGED |
+| state.json | UPDATED |
+| .env.example | UPDATED |

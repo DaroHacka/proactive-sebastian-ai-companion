@@ -19,8 +19,13 @@ from time_parser import (
     parse_generic_time,
     parse_response_for_time,
 )
+from cue_manager import get_random_cue, get_cue_count, get_cue_by_category
 
 load_dotenv()
+
+# Cue Configuration
+CUE_ENABLED = os.getenv("CUE_ENABLED", "true").lower() == "true"
+CUE_PROBABILITY = float(os.getenv("CUE_PROBABILITY", "0.2"))  # 20% default
 
 # Configuration
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -99,6 +104,16 @@ def send_to_ollama(user_message: str, conversation_history: list = None) -> str:
         messages.extend(conversation_history)
     messages.append({"role": "user", "content": user_message})
 
+    response = requests.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={"model": MODEL, "messages": messages, "stream": False},
+    )
+    response.raise_for_status()
+    return response.json()["message"]["content"]
+
+
+def send_to_ollama_with_context(messages: list) -> str:
+    """Send messages with pre-built context (for cue injection)."""
     response = requests.post(
         f"{OLLAMA_URL}/api/chat",
         json={"model": MODEL, "messages": messages, "stream": False},
@@ -336,16 +351,18 @@ def main():
     print("=" * 50)
     print()
     print("Commands:")
-    print("  trigger   - Trigger proactive conversation")
-    print("  pause    - Pause auto-scheduler")
-    print("  resume   - Resume auto-scheduler")
+    print("  trigger    - Trigger proactive conversation")
+    print("  pause     - Pause auto-scheduler")
+    print("  resume    - Resume auto-scheduler")
     print("  interval X - Set check interval to X minutes")
     print("  status    - Show appointments status")
     print("  clear-schedule - Clear scheduled appointments")
-    print("  clear-all   - Clear all data")
+    print("  clear-all  - Clear all data")
     print("  memory status - Show memory statistics")
     print("  medium memory - Load medium memory context")
     print("  long memory  - Load long-term memory context")
+    print("  cue        - Show random cue (for testing)")
+    print("  cue X     - Get cue from category X")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
     print()
@@ -478,14 +495,65 @@ def main():
                 print("  (Will be included in next chat)")
             continue
 
+        if cmd == "cue":
+            # Show a random cue
+            if CUE_ENABLED:
+                code, text, is_combo = get_random_cue(single_only=False)
+                combo_str = " (COMBO)" if is_combo else ""
+                print(f"\n[Cue: {code}]{combo_str}")
+                print(f"  {text}")
+            else:
+                print("[Cue system disabled]")
+            continue
+
+        if cmd.startswith("cue "):
+            # Get cue from category
+            category = cmd.split(" ", 1)[1]
+            if CUE_ENABLED:
+                code, text = get_cue_by_category(category)
+                if code:
+                    print(f"\n[Cue: {code}]")
+                    print(f"  {text}")
+                else:
+                    print(f"[Category not found: {category}]")
+            else:
+                print("[Cue system disabled]")
+            continue
+
         # Normal chat
         merged_context = (
             _loaded_memory["medium"]
             + _loaded_memory["longterm"]
             + get_conversation_context()
         )
+
+        # Check for trigger cue (20% chance)
+        cue_code = ""
+        cue_applied = False
+
+        if CUE_ENABLED and random.random() < CUE_PROBABILITY:
+            cue_code, cue_text, is_combo = get_random_cue(single_only=False)
+            if cue_code:
+                cue_applied = True
+                print(f"\n[Cue applied: {cue_code}]")
+
         try:
-            response = send_to_ollama(user_input, merged_context)
+            # Build conversation with optional cue instruction
+            if cue_applied:
+                # Add cue as system instruction
+                system_instruction = {
+                    "role": "system",
+                    "content": f"{cue_code}: {cue_text}",
+                }
+                messages = (
+                    [system_instruction]
+                    + merged_context
+                    + [{"role": "user", "content": user_input}]
+                )
+                response = send_to_ollama_with_context(messages)
+            else:
+                response = send_to_ollama(user_input, merged_context)
+
             print(f"\nSebastian: {response}")
 
             # Check if response contains time reference → create appointment

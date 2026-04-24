@@ -1,0 +1,67 @@
+# Sebastian AI Companion - Implementation Plan
+
+## Session Summary (April 23, 2026)
+
+### What We Did:
+
+1. **Removed `chat` command** - User just types message and presses Enter
+2. **Implemented auto-scheduler** - phi4 contacts user proactively
+3. **Commands:**
+   - `trigger` - Manual trigger for phi4 to contact
+   - `pause` / `resume` - Pause/resume automatic scheduler
+   - `interval X` - Set initiative timing (X minutes between contacts)
+   - `status` - Show appointment schedule (NEEDS FIX: currently triggers AI)
+   - `clear` - Clear screen
+   - `quit` / `exit` - Exit
+
+### Missing Commands to Add:
+
+1. `clear-schedule` - Clear scheduled appointments
+2. `clear-all` - Clear all data (appointments + memory)
+3. `memory status` - Show memory statistics (fresh/medium/long counts)
+4. `medium memory` - Load medium-term memory into context
+5. `long memory` - Load long-term memory into context
+
+### Implementation Details:
+
+#### Auto-schedule Pause Logic:
+- When user creates manual appointment (e.g., "call me tonight") → pause auto-scheduler
+- Resume in 2 ways:
+  a) `clear-schedule` or `clear-all` command is issued
+  b) When the appointment fires (appointment time arrives)
+
+#### Time Parsing:
+- **Explicit times:** 8:00, 9pm, 2am, etc. → Use exact time
+- **Generic times:** Map to time ranges:
+  - early morning: 5:00 - 7:00
+  - morning: 8:00 - 11:00
+  - noon: 12:00
+  - lunch: 12:00 - 13:00
+  - afternoon: 13:00 - 17:00
+  - evening: 18:00 - 20:00
+  - night: 21:00 - 23:00
+  - soon: current time + 15-30 min
+  - later: current time + 1-2 hours
+  - tomorrow: tomorrow same time range
+  - tomorrow morning: tomorrow 8:00 - 11:00
+  - tomorrow afternoon: tomorrow 13:00 - 17:00
+  - tomorrow night: tomorrow 21:00 - 23:00
+
+### Files:
+
+- `/home/daniel/AI/sebastian_proactive.py` - Main script
+- `/home/daniel/AI/scheduler.py` - Scheduler module
+- `/home/daniel/AI/intent_manager.py` - Intent management
+- `/home/daniel/AI/interaction_intents.txt` - Check-in phrases
+- `/home/daniel/AI/memory/` - Memory storage (fresh.json, medium.json, longterm.json)
+- `/home/daniel/AI/appointments.json` - Appointments storage
+
+### Todo List:
+
+1. [ ] Add memory commands: memory status, medium memory, long memory
+2. [ ] Add clear-schedule and clear-all commands
+3. [ ] Fix status command - show appointments, not trigger AI
+4. [ ] Implement auto-schedule pause on manual appointment creation
+5. [ ] Implement auto-schedule resume when appointment fires
+6. [ ] Implement time parsing for generic times
+7. [ ] Test all implementations
