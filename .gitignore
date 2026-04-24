@@ -36,3 +36,4 @@ memory/
 state.json
 last_interaction.json
 appointments.json
+opencode-session.txt
