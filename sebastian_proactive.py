@@ -39,6 +39,9 @@ APPOINTMENTS_FILE = "appointments.json"
 # Memory loading state
 _loaded_memory = {"medium": [], "longterm": []}
 
+# Session context for fast API (Ollama context array - avoids re-evaluation)
+_session_context = None
+
 RANDOM_INTERVALS = [2, 3, 4, 5, 6, 7, 8, 12, 24]
 
 SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. You are a caring friend who checks in on him from time to time. Speak naturally as an old friend would - never mention you are an AI. Keep responses short and conversational."""
@@ -100,27 +103,76 @@ def save_state(state):
 
 
 def send_to_ollama(user_message: str, conversation_history: list = None) -> str:
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    if conversation_history:
-        messages.extend(conversation_history)
-    messages.append({"role": "user", "content": user_message})
+    """Optimized: Uses /api/generate with context array for faster responses."""
+    global _session_context
+
+    # Build prompt with system prompt
+    full_prompt = f"{SYSTEM_PROMPT}\n\nUser: {user_message}"
+
+    # Use context array if available (fast mode), otherwise full chat (slow mode)
+    payload = {
+        "model": MODEL,
+        "prompt": full_prompt,
+        "stream": False,
+    }
+
+    # Add context if we have it (this makes it fast!)
+    if _session_context is not None:
+        payload["context"] = _session_context
 
     response = requests.post(
-        f"{OLLAMA_URL}/api/chat",
-        json={"model": MODEL, "messages": messages, "stream": False},
+        f"{OLLAMA_URL}/api/generate",
+        json=payload,
     )
     response.raise_for_status()
-    return response.json()["message"]["content"]
+    result = response.json()
+
+    # Save context for next message (this is the magic!)
+    if "context" in result:
+        _session_context = result["context"]
+
+    return result["response"]
 
 
 def send_to_ollama_with_context(messages: list) -> str:
     """Send messages with pre-built context (for cue injection)."""
+    global _session_context
+
+    # Convert messages to single prompt
+    prompt_parts = [SYSTEM_PROMPT]
+    for msg in messages:
+        role = msg.get("role", "user")
+        if role == "system":
+            prompt_parts.append(msg["content"])
+        elif role == "user":
+            prompt_parts.append(f"User: {msg['content']}")
+        elif role == "assistant":
+            prompt_parts.append(f"Assistant: {msg['content']}")
+
+    full_prompt = "\n\n".join(prompt_parts)
+
+    payload = {
+        "model": MODEL,
+        "prompt": full_prompt,
+        "stream": False,
+    }
+
+    # Use context if available
+    if _session_context is not None:
+        payload["context"] = _session_context
+
     response = requests.post(
-        f"{OLLAMA_URL}/api/chat",
-        json={"model": MODEL, "messages": messages, "stream": False},
+        f"{OLLAMA_URL}/api/generate",
+        json=payload,
     )
     response.raise_for_status()
-    return response.json()["message"]["content"]
+    result = response.json()
+
+    # Save context
+    if "context" in result:
+        _session_context = result["context"]
+
+    return result["response"]
 
 
 # ==================== MEMORY ====================
@@ -430,6 +482,8 @@ def main():
 
         if cmd == "quit" or cmd == "exit":
             print("\nSebastian: Talk soon!")
+            # Clear session context when quitting
+            _session_context = None
             break
 
         if cmd == "clear":
@@ -567,6 +621,8 @@ def main():
                 filepath = os.path.join(MEMORY_DIR, f)
                 with open(filepath, "w") as fp:
                     json.dump([], fp)
+            # Clear session context (Ollama context array)
+            _session_context = None
             sched_module.resume_scheduler(auto_trigger_handler)
             print("[All data cleared, scheduler resumed]")
             continue
