@@ -125,6 +125,29 @@ def send_to_ollama_with_context(messages: list) -> str:
 # ==================== MEMORY ====================
 
 
+def get_fresh_context(num_recent: int = 10) -> list:
+    """Get only fresh memory (recent conversation context)."""
+    ensure_memory_dir()
+    filepath = os.path.join(MEMORY_DIR, "fresh.json")
+
+    if not os.path.exists(filepath):
+        return []
+
+    with open(filepath, "r") as f:
+        memory = json.load(f)
+
+    if not memory:
+        return []
+
+    context = []
+    for item in memory[-num_recent:]:
+        if "user_message" in item:
+            context.append({"role": "user", "content": item["user_message"]})
+        if "ai_message" in item:
+            context.append({"role": "assistant", "content": item["ai_message"]})
+    return context
+
+
 def get_conversation_context(num_recent: int = 10) -> list:
     ensure_memory_dir()
     memory = []
@@ -438,20 +461,22 @@ def main():
 
         if cmd == "trigger cue":
             # Force cue then wait for user message
-            code, text, is_combo = get_random_cue(single_only=False)
+            cue_code, cue_text, is_combo = get_random_cue(single_only=False)
             combo_str = " (COMBO)" if is_combo else ""
-            print(f"\n[Cue ready: {code}]{combo_str}")
-            print(f"  {text}")
+            print(f"\n[Cue ready: {cue_code}]{combo_str}")
+            print(f"  {cue_text}")
             print("\nType your message...")
-            forced_cue = (code, text)
             user_msg = input("\nYou: ").strip()
             if user_msg:
-                # Send message with forced cue
-                system_instruction = {"role": "system", "content": f"{code}: {text}"}
+                # Send message with forced cue - include default persona
+                system_instruction = {
+                    "role": "system",
+                    "content": f"{SYSTEM_PROMPT}\n\n{cue_code}: {cue_text}",
+                }
                 merged_context = (
                     _loaded_memory["medium"]
                     + _loaded_memory["longterm"]
-                    + get_conversation_context()
+                    + get_fresh_context()
                 )
                 messages = (
                     [system_instruction]
@@ -461,6 +486,7 @@ def main():
                 response = send_to_ollama_with_context(messages)
                 print(f"\nSebastian: {response}")
                 save_conversation(user_msg, response)
+            continue
             continue
 
         if cmd.startswith("interval "):
@@ -550,9 +576,7 @@ def main():
 
         # Normal chat
         merged_context = (
-            _loaded_memory["medium"]
-            + _loaded_memory["longterm"]
-            + get_conversation_context()
+            _loaded_memory["medium"] + _loaded_memory["longterm"] + get_fresh_context()
         )
 
         # Check for trigger cue (20% chance)
@@ -568,10 +592,10 @@ def main():
         try:
             # Build conversation with optional cue instruction
             if cue_applied:
-                # Add cue as system instruction
+                # Add cue as system instruction - include default persona
                 system_instruction = {
                     "role": "system",
-                    "content": f"{cue_code}: {cue_text}",
+                    "content": f"{SYSTEM_PROMPT}\n\n{cue_code}: {cue_text}",
                 }
                 messages = (
                     [system_instruction]
