@@ -9,6 +9,7 @@ import json
 import time
 import random
 import requests
+import threading
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from intent_manager import get_random_intent
@@ -336,6 +337,19 @@ def auto_trigger_handler(reason):
     save_conversation("[AUTO TRIGGER - {}]".format(reason), msg)
 
 
+def background_scheduler():
+    """Background thread that checks for due appointments/events."""
+    while True:
+        # Check scheduler is enabled
+        if sched_module.is_enabled():
+            # Check for due appointments or random checks
+            check_and_trigger(auto_trigger_handler)
+
+        # Sleep for configured interval (from .env or default 5 minutes)
+        interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", 5))
+        time.sleep(interval * 60)
+
+
 def trigger_conversation() -> str:
     """Generate a proactive conversation starter using random intent."""
     intent = get_random_intent()
@@ -399,7 +413,9 @@ def main():
     print(f"[Scheduler: {interval}min interval, auto={auto_enabled}]")
 
     if auto_enabled:
-        sched_module.start_scheduler(auto_trigger_handler)
+        # Start background scheduler thread
+        thread = threading.Thread(target=background_scheduler, daemon=True)
+        thread.start()
 
     while True:
         # Check due appointments immediately on each iteration
