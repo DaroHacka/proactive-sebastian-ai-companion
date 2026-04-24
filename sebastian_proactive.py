@@ -468,25 +468,26 @@ def main():
             print("\nType your message...")
             user_msg = input("\nYou: ").strip()
             if user_msg:
-                # Send message with forced cue - include default persona
+                # Send message with forced cue - impersonation game format
                 system_instruction = {
                     "role": "system",
-                    "content": f"{SYSTEM_PROMPT}\n\n{cue_code}: {cue_text}",
+                    "content": f"We are doing an impersonation game.\n"
+                    f"Play this character/behavior in your response:\n"
+                    f"{cue_code}: {cue_text}\n"
+                    f"Now respond to the user naturally as this character.\n"
+                    f"-----\n"
+                    f"User message: {user_msg}\n"
+                    f"-----",
                 }
                 merged_context = (
                     _loaded_memory["medium"]
                     + _loaded_memory["longterm"]
                     + get_fresh_context()
                 )
-                messages = (
-                    [system_instruction]
-                    + merged_context
-                    + [{"role": "user", "content": user_msg}]
-                )
+                messages = [system_instruction] + merged_context
                 response = send_to_ollama_with_context(messages)
                 print(f"\nSebastian: {response}")
                 save_conversation(user_msg, response)
-            continue
             continue
 
         if cmd.startswith("interval "):
@@ -592,16 +593,18 @@ def main():
         try:
             # Build conversation with optional cue instruction
             if cue_applied:
-                # Add cue as system instruction - include default persona
+                # Add cue as system instruction - impersonation game format
                 system_instruction = {
                     "role": "system",
-                    "content": f"{SYSTEM_PROMPT}\n\n{cue_code}: {cue_text}",
+                    "content": f"We are doing an impersonation game.\n"
+                    f"Play this character/behavior in your response:\n"
+                    f"{cue_code}: {cue_text}\n"
+                    f"Now respond to the user naturally as this character.\n"
+                    f"-----\n"
+                    f"User message: {user_input}\n"
+                    f"-----",
                 }
-                messages = (
-                    [system_instruction]
-                    + merged_context
-                    + [{"role": "user", "content": user_input}]
-                )
+                messages = [system_instruction] + merged_context
                 response = send_to_ollama_with_context(messages)
             else:
                 response = send_to_ollama(user_input, merged_context)
