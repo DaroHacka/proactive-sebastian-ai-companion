@@ -1,1 +1,0 @@
-when long_term memory is full save the one exceeding into a file.

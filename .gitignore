@@ -12,6 +12,10 @@ backup/
 *.log
 sebastian.log
 
+# Implementation notes & workflow plans
+todo/
+implementation/
+
 # Python
 __pycache__/
 *.pyc
