@@ -6,6 +6,7 @@
 # Data files (user-specific)
 *.json
 !interaction_intents.txt
+!special_dates.json
 
 # Backups & logs
 backup/
@@ -15,6 +16,9 @@ sebastian.log
 # Implementation notes & workflow plans
 todo/
 implementation/
+
+# Proactive schedule (generated locally)
+proactive_schedule.json
 
 # Python
 __pycache__/

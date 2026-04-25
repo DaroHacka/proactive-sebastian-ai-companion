@@ -17,6 +17,7 @@ from intent_manager import get_random_intent
 import scheduler as sched_module
 
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+PROACTIVE_MODE = os.getenv("PROACTIVE_MODE", "false").lower() == "true"
 from time_parser import (
     is_generic_time,
     extract_time_expression,
@@ -24,6 +25,12 @@ from time_parser import (
     parse_response_for_time,
 )
 from cue_manager import get_random_cue, get_cue_count, get_cue_by_category
+from proactive_scheduler import (
+    initialize_proactive_schedule,
+    get_next_proactive_contact,
+    complete_proactive_contact,
+    get_proactive_status,
+)
 
 load_dotenv()
 
@@ -533,9 +540,49 @@ def background_scheduler():
         if sched_module.is_enabled():
             sched_module.check_and_trigger(auto_trigger_handler)
         
+        # Check proactive contacts if enabled
+        if PROACTIVE_MODE:
+            proactive_trigger()
+        
         # Sleep for configured interval (from .env or default 5 minutes)
         interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", 5))
         time.sleep(interval * 60)
+
+
+def proactive_trigger():
+    """Check and trigger proactive contact if due."""
+    contact = get_next_proactive_contact()
+    
+    if contact:
+        print(f"\n[Proactive trigger: {contact['activity']}]")
+        msg = trigger_proactive_conversation(contact)
+        print(f"\nSebastian: {msg}")
+        save_conversation(f"[PROACTIVE - {contact['activity']}]", msg)
+        complete_proactive_contact(contact["id"])
+
+
+def trigger_proactive_conversation(contact) -> str:
+    """Generate a proactive message with activity context."""
+    # Build prompt with activity and mood context
+    activity = contact.get("activity", "MORNING")
+    mood = contact.get("mood", "NEUTRAL")
+    intent_prompt = contact.get("intent", "How are you?")
+    special = contact.get("special")
+    
+    # Build context string
+    context_parts = [f"Activity: {activity}", f"Mood: {mood}"]
+    if special:
+        context_parts.append(f"Special: {special}")
+    context_str = "\n".join(context_parts)
+    
+    prompt = f"""{TRIGGER_CONVERSATION_PROMPT.format(intent=intent_prompt, context=context_str)}"""
+    
+    try:
+        response = send_to_ollama(prompt)
+        return response
+    except Exception as e:
+        logger.error(f"Proactive trigger error: {e}")
+        return "Hey! Just checking in on you!"
 
 
 def trigger_conversation() -> str:
@@ -579,8 +626,10 @@ def main():
     print("  trigger    - Trigger proactive conversation")
     print("  pause     - Pause auto-scheduler")
     print("  resume    - Resume auto-scheduler")
+    print("  resume proactive - Enable proactive schedule")
+    print("  skip      - Skip current proactive contact")
     print("  interval X - Set check interval to X minutes")
-    print("  status    - Show appointments status")
+    print("  status    - Show status (appointments + proactive)")
     print("  clear-schedule - Clear scheduled appointments")
     print("  clear-all  - Clear all data")
     print("  memory status - Show memory statistics")
@@ -601,9 +650,13 @@ def main():
     # Initialize automatic schedule on launch - clears stale random_check
     sched_module.initialize_automatic_schedule()
     
+    # Initialize proactive schedule (monthly)
+    proactive_status = initialize_proactive_schedule()
+    
     auto_enabled = os.getenv("AUTOMATIC_ENABLED", "false").lower() == "true"
 
     print(f"[Scheduler: {interval}min interval, auto={auto_enabled}]")
+    print(f"[Proactive schedule: {proactive_status.get('month', 'N/A')}, {proactive_status.get('stats', {}).get('pending', 0)} contacts pending]")
     if TEST_MODE:
         print("[TEST MODE: enabled - rapid triggering]")
 
@@ -650,8 +703,10 @@ def main():
             print("  trigger    - Trigger proactive conversation")
             print("  pause     - Pause auto-scheduler")
             print("  resume    - Resume auto-scheduler")
+            print("  resume proactive - Enable proactive schedule")
+            print("  skip      - Skip current proactive contact")
             print("  interval X - Set check interval to X minutes")
-            print("  status    - Show appointments status")
+            print("  status    - Show status (appointments + proactive)")
             print("  clear-schedule - Clear scheduled appointments")
             print("  clear-all  - Clear all data")
             print("  memory status - Show memory statistics")
@@ -690,6 +745,10 @@ def main():
                 a for a in data.get("appointments", []) if a["status"] == "pending"
             ]
             completed = data.get("completed_count", 0)
+            
+            # Get proactive status
+            proactive = get_proactive_status()
+            proactive_stats = proactive.get("stats", {}) if proactive else {}
 
             print(f"\n[Status]")
             print(f"  Appointments due: {len(pending)}")
@@ -697,6 +756,8 @@ def main():
             print(
                 f"  Scheduler: interval={interval}min, auto={sched_module.is_enabled()}"
             )
+            if proactive:
+                print(f"  Proactive: {proactive.get('month')} - {proactive_stats.get('pending',0)} pending, {proactive_stats.get('completed',0)} done")
 
             if pending:
                 print("  Pending appointments:")
@@ -728,6 +789,25 @@ def main():
         if cmd == "resume":
             sched_module.resume_scheduler(auto_trigger_handler)
             print("[Scheduler resumed]")
+            continue
+
+        if cmd == "resume proactive":
+            proactive = get_proactive_status()
+            if proactive:
+                os.environ["PROACTIVE_MODE"] = "true"
+                print(f"[Proactive schedule: {proactive.get('month')}]")
+                print(f"[{proactive.get('stats', {}).get('pending', 0)} contacts pending]")
+            else:
+                print("[No proactive schedule. Generate one first.]")
+            continue
+
+        if cmd == "skip":
+            # Skip current proactive contact
+            contact = get_next_proactive_contact()
+            if contact:
+                from proactive_scheduler import skip_proactive_contact as skip
+                skip(contact["id"])
+                print(f"[Skipped: {contact['activity']}]")
             continue
 
         if cmd == "trigger cue":
