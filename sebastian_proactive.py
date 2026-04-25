@@ -562,20 +562,22 @@ def proactive_trigger():
 
 
 def trigger_proactive_conversation(contact) -> str:
-    """Generate a proactive message with activity context."""
-    # Build prompt with activity and mood context
+    """Generate a proactive message using intent system + activity context."""
+    # Use existing intent system for the message topic
+    intent = get_random_intent()
+    
+    # Activity is just for time-based context
     activity = contact.get("activity", "MORNING")
-    mood = contact.get("mood", "NEUTRAL")
-    intent_prompt = contact.get("intent", "How are you?")
-    special = contact.get("special")
     
-    # Build context string
-    context_parts = [f"Activity: {activity}", f"Mood: {mood}"]
-    if special:
-        context_parts.append(f"Special: {special}")
-    context_str = "\n".join(context_parts)
+    # Get conversation context
+    context = get_conversation_context(num_recent=5)
+    if context:
+        context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
+    else:
+        context_str = "Activity: {activity}"
     
-    prompt = f"""{TRIGGER_CONVERSATION_PROMPT.format(intent=intent_prompt, context=context_str)}"""
+    # Build prompt using existing system
+    prompt = TRIGGER_CONVERSATION_PROMPT.format(intent=intent, context=context_str)
     
     try:
         response = send_to_ollama(prompt)
@@ -795,8 +797,22 @@ def main():
             proactive = get_proactive_status()
             if proactive:
                 os.environ["PROACTIVE_MODE"] = "true"
-                print(f"[Proactive schedule: {proactive.get('month')}]")
-                print(f"[{proactive.get('stats', {}).get('pending', 0)} contacts pending]")
+                # Show next contact time
+                next_contact = get_next_proactive_contact()
+                if next_contact:
+                    due = datetime.fromisoformat(next_contact['due'])
+                    diff = (due - datetime.now()).total_seconds() / 60
+                    if diff < 0:
+                        time_str = "NOW"
+                    else:
+                        mins = int(diff)
+                        time_str = f"{mins}min" if mins < 60 else f"{mins//60}h {mins%60}min"
+                    print(f"[Proactive: {proactive.get('month')}]")
+                    print(f"[Next: {due.strftime('%H:%M')} ({time_str}) - {next_contact['activity']}]")
+                    print(f"[{proactive.get('stats', {}).get('pending', 0)} pending]")
+                else:
+                    print(f"[Proactive: {proactive.get('month')}]")
+                    print(f"[No pending contacts]")
             else:
                 print("[No proactive schedule. Generate one first.]")
             continue

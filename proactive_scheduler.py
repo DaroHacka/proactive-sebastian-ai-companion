@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 PROACTIVE_SCHEDULE_FILE = "proactive_schedule.json"
 SPECIAL_DATES_FILE = "special_dates.json"
-now = datetime.now()
 
 # Activity categories
 ACTIVITIES = {
@@ -213,9 +212,6 @@ def generate_monthly_schedule(year, month):
                         "id": contact_id,
                         "due": contact_time.isoformat(),
                         "activity": get_activity_by_hour(first_hour),
-                        "mood": get_mood(get_activity_by_hour(first_hour), special_activity),
-                        "intent": get_activity_prompt(get_activity_by_hour(first_hour), special_activity),
-                        "special": special_activity,
                         "status": "pending"
                     })
                     contact_id += 1
@@ -245,9 +241,6 @@ def generate_monthly_schedule(year, month):
                         "id": contact_id,
                         "due": contact_time.isoformat(),
                         "activity": get_activity_by_hour(hour),
-                        "mood": get_mood(get_activity_by_hour(hour), special_activity),
-                        "intent": get_activity_prompt(get_activity_by_hour(hour), special_activity),
-                        "special": special_activity,
                         "status": "pending"
                     })
                     contact_id += 1
@@ -340,8 +333,8 @@ def get_next_proactive_contact():
     for contact in schedule.get("schedule", []):
         if contact["status"] == "pending":
             due = datetime.fromisoformat(contact["due"])
-            if due <= now:
-                return contact
+            # Return the next pending contact (regardless of whether it's due now or in future)
+            return contact
     
     return None
 
