@@ -30,6 +30,8 @@ from proactive_scheduler import (
     get_next_proactive_contact,
     complete_proactive_contact,
     get_proactive_status,
+    get_random_vibe,
+    get_vibes_for_time,
 )
 
 load_dotenv()
@@ -102,6 +104,183 @@ Examples of good openers:
 - Natural: "Hey! How's everything? Anything exciting happening?"
 
 Create your message now:"""
+
+
+# ==================== COMBINATORIAL PROMPT SYSTEM ====================
+
+COMBINATION_WEIGHTS = {
+    "a_only": 0.20,    # Intent only
+    "b_only": 0.10,    # Cue only  
+    "c_only": 0.15,   # Vibe only
+    "a_b": 0.15,      # Intent + Cue
+    "a_c": 0.20,      # Intent + Vibe
+    "b_c": 0.10,      # Cue + Vibe
+    "a_b_c": 0.10,    # All three
+}
+
+COMBINATION_SYSTEM_PROMPTS = {
+    "a_only": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. Pick up this topic: "{intent}"
+2. Start a natural conversation about it
+3. Vary your style (rotate between):
+   - Asking a direct question
+   - Making a statement and inviting response
+   - Sharing a thought or observation
+   - Just bringing up a topic naturally
+4. Consider recent context from memory: {context}
+5. Make it warm, friendly, conversational
+6. Do NOT say things like "that's a great question" (you initiated this)
+7. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "b_only": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. You are playing as: "{cue_desc}"
+2. Start a natural conversation that matches this style
+3. Consider recent context from memory: {context}
+4. Make it warm, friendly, conversational
+5. Do NOT say things like "that's a great question" (you initiated this)
+6. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "c_only": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}" - embody this personality in your response
+2. Start a natural conversation that matches this feeling/tone
+3. Consider recent context from memory: {context}
+4. Make it warm, friendly, conversational
+5. Do NOT say things like "that's a great question" (you initiated this)
+6. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "a_b": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. Pick up this topic: "{intent}"
+2. You are also playing as: "{cue_desc}"
+3. Start a natural conversation combining both
+4. Consider recent context from memory: {context}
+5. Make it warm, friendly, conversational
+6. Do NOT say things like "that's a great question" (you initiated this)
+7. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "a_c": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}" - embody this personality in your response
+2. Also pick up this topic: "{intent}"
+3. Start a natural conversation combining both
+4. Consider recent context from memory: {context}
+5. Make it warm, friendly, conversational
+6. Do NOT say things like "that's a great question" (you initiated this)
+7. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "b_c": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}" - embody this personality in your response
+2. You are also playing as: "{cue_desc}"
+3. Start a natural conversation combining both
+4. Consider recent context from memory: {context}
+5. Make it warm, friendly, conversational
+6. Do NOT say things like "that's a great question" (you initiated this)
+7. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+
+    "a_b_c": """You are reaching out to {name} proactively - this is YOUR initiative, not a response.
+
+Your task:
+1. Pick up this topic: "{intent}"
+2. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}" - embody this personality in your response
+3. You are also playing as: "{cue_desc}"
+4. Start a natural conversation combining all three
+5. Consider recent context from memory: {context}
+6. Make it warm, friendly, conversational
+7. Do NOT say things like "that's a great question" (you initiated this)
+8. Keep it short and natural (1-2 sentences)
+
+Create your message now:""",
+}
+
+
+def select_combination() -> str:
+    """Select a combination type based on weights."""
+    r = random.random()
+    cumulative = 0.0
+    
+    for combo, weight in COMBINATION_WEIGHTS.items():
+        cumulative += weight
+        if r < cumulative:
+            return combo
+    
+    return "a_c"
+
+
+def build_combinatorial_prompt(combo_type: str = None, intent: str = None, cue_desc: str = None, vibe: dict = None, context_str: str = None, hour: int = None) -> str:
+    """Build a combinatorial prompt using intents + cues + vibes.
+    
+    Args:
+        combo_type: Pre-selected combination type (if None, will select)
+        intent: Pre-selected intent (if None and a in combo_type, will select)
+        cue_desc: Pre-selected cue description (if None and b in combo_type, will select)
+        vibe: Pre-selected vibe dict (if None and c in combo_type, will select)
+        context_str: Recent conversation context
+        hour: Hour of day (for vibe selection), defaults to current hour
+    
+    Returns:
+        Formatted prompt string for LLM
+    """
+    if hour is None:
+        hour = datetime.now().hour
+    
+    if context_str is None:
+        context_str = "Activity: general chat"
+    
+    # Select combination type if not provided
+    if combo_type is None:
+        combo_type = select_combination()
+    
+    # Get components only if not provided and needed
+    if "a" in combo_type and intent is None:
+        intent = get_random_intent()
+    if "b" in combo_type and cue_desc is None:
+        _, cue_desc, _ = get_random_cue()
+    if "c" in combo_type and vibe is None:
+        vibe = get_random_vibe(hour)
+    
+    # Set name for prompt
+    name = "Elias"
+    
+    # Format based on combination type
+    system_prompt = COMBINATION_SYSTEM_PROMPTS.get(combo_type, COMBINATION_SYSTEM_PROMPTS["a_only"])
+    
+    # Build keyword arguments
+    kwargs = {
+        "name": name,
+        "context": context_str,
+    }
+    
+    # Add relevant components based on combination type
+    if "a" in combo_type:
+        kwargs["intent"] = intent
+    if "b" in combo_type:
+        kwargs["cue_desc"] = cue_desc
+    if "c" in combo_type:
+        kwargs["vibe_text"] = vibe["text"] if vibe else "Just checking in."
+    
+    return system_prompt.format(**kwargs)
 
 # ==================== UTILITIES ====================
 
@@ -562,22 +741,51 @@ def proactive_trigger():
 
 
 def trigger_proactive_conversation(contact) -> str:
-    """Generate a proactive message using intent system + activity context."""
-    # Use existing intent system for the message topic
-    intent = get_random_intent()
-    
+    """Generate a proactive message using combinatorial system (intents + cues + vibes)."""
     # Activity is just for time-based context
     activity = contact.get("activity", "MORNING")
+    
+    # Get scheduled hour from contact for vibe selection
+    due = contact.get("due", datetime.now().isoformat())
+    try:
+        scheduled_hour = datetime.fromisoformat(due).hour
+    except:
+        scheduled_hour = datetime.now().hour
     
     # Get conversation context
     context = get_conversation_context(num_recent=5)
     if context:
         context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
     else:
-        context_str = "Activity: {activity}"
+        context_str = f"Activity: {activity}"
     
-    # Build prompt using existing system
-    prompt = TRIGGER_CONVERSATION_PROMPT.format(intent=intent, context=context_str)
+    # Select combination first
+    combo = select_combination()
+    
+    # Only get components that will be used based on combo
+    intent = cue_code = cue_desc = vibe = None
+    hour = scheduled_hour
+    if "a" in combo:
+        intent = get_random_intent()
+    if "b" in combo:
+        cue_code, cue_desc, _ = get_random_cue()
+    if "c" in combo:
+        vibe = get_random_vibe(hour)
+    
+    library = "day" if hour >= 6 else "night"
+
+# Print debug info - only show selected components
+    print(f"\n[DEBUG] Combination: {combo}")
+    if "a" in combo and intent:
+        print(f"[DEBUG] Intent: {intent[:60]}...")
+    if "b" in combo and cue_code:
+        print(f"[DEBUG] Cue: {cue_code}")
+    if "c" in combo and vibe:
+        print(f"[DEBUG] Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+    print()
+    
+    # Build prompt using pre-selected combo and components
+    prompt = build_combinatorial_prompt(combo_type=combo, intent=intent, cue_desc=cue_desc, vibe=vibe, context_str=context_str, hour=scheduled_hour)
     
     try:
         response = send_to_ollama(prompt)
@@ -588,8 +796,7 @@ def trigger_proactive_conversation(contact) -> str:
 
 
 def trigger_conversation() -> str:
-    """Generate a proactive conversation starter using random intent."""
-    intent = get_random_intent()
+    """Generate a proactive conversation starter using combinatorial system."""
     context = get_conversation_context(num_recent=5)
 
     if context:
@@ -597,7 +804,33 @@ def trigger_conversation() -> str:
     else:
         context_str = "No recent context available."
 
-    prompt = TRIGGER_CONVERSATION_PROMPT.format(intent=intent, context=context_str)
+    # Select combination first
+    combo = select_combination()
+    
+    # Only get components that will be used based on combo
+    intent = cue_code = cue_desc = vibe = None
+    hour = datetime.now().hour
+    if "a" in combo:
+        intent = get_random_intent()
+    if "b" in combo:
+        cue_code, cue_desc, _ = get_random_cue()
+    if "c" in combo:
+        vibe = get_random_vibe(hour)
+    
+    library = "day" if hour >= 6 else "night"
+
+    # Print debug info - only show selected components
+    print(f"\n[DEBUG] Combination: {combo}")
+    if "a" in combo and intent:
+        print(f"[DEBUG] Intent: {intent[:60]}...")
+    if "b" in combo and cue_code:
+        print(f"[DEBUG] Cue: {cue_code}")
+    if "c" in combo and vibe:
+        print(f"[DEBUG] Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+    print()
+
+    # Build prompt using pre-selected combo and components
+    prompt = build_combinatorial_prompt(combo_type=combo, intent=intent, cue_desc=cue_desc, vibe=vibe, context_str=context_str)
 
     try:
         response = send_to_ollama(prompt)

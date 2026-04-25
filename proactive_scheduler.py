@@ -21,6 +21,89 @@ logger = logging.getLogger(__name__)
 
 PROACTIVE_SCHEDULE_FILE = "proactive_schedule.json"
 SPECIAL_DATES_FILE = "special_dates.json"
+VIBE_LIBRARY_DAY = "vibe_library_01.txt"
+VIBE_LIBRARY_NIGHT = "vibe_library_02.txt"
+
+# Vibe library cache
+_vibe_library_day = None
+_vibe_library_night = None
+
+
+def load_vibe_library(filename):
+    """Load vibe library from file and parse vibes."""
+    vibes = []
+    current_category = None
+    
+    if not os.path.exists(filename):
+        logger.warning(f"Vibe library not found: {filename}")
+        return []
+    
+    with open(filename, "r") as f:
+        for line in f:
+            line = line.strip()
+            
+            # Skip empty lines and headers
+            if not line or line.startswith("###") or line.startswith("---"):
+                continue
+            
+            # Check for category headers
+            if "(" in line and ")" in line and not line.startswith("["):
+                current_category = line.split("(")[0].strip()
+                continue
+            
+            # Parse vibe lines
+            if "[VIBE:" in line:
+                # Extract vibe name and text
+                parts = line.split("]", 1)
+                if len(parts) == 2:
+                    vibe_name = parts[0].replace("[VIBE:", "").strip()
+                    vibe_text = parts[1].strip()
+                    vibes.append({
+                        "name": vibe_name,
+                        "text": vibe_text,
+                        "category": current_category or "UNCATEGORIZED"
+                    })
+    
+    return vibes
+
+
+def get_vibes_for_time(hour):
+    """Get appropriate vibes based on time of day.
+    
+    Returns day vibes (07:00-23:30) or night vibes (02:00-06:00).
+    """
+    global _vibe_library_day, _vibe_library_night
+    
+    # Load libraries if not cached
+    if _vibe_library_day is None:
+        _vibe_library_day = load_vibe_library(VIBE_LIBRARY_DAY)
+    if _vibe_library_night is None:
+        _vibe_library_night = load_vibe_library(VIBE_LIBRARY_NIGHT)
+    
+    # Return appropriate library based on hour
+    if 2 <= hour < 6:
+        return _vibe_library_night
+    else:
+        return _vibe_library_day
+
+
+def get_random_vibe(hour=None):
+    """Get a random vibe for the given hour (or current hour if None)."""
+    if hour is None:
+        hour = datetime.now().hour
+    
+    vibes = get_vibes_for_time(hour)
+    if vibes:
+        return random.choice(vibes)
+    return None
+
+
+def get_vibes_count(hour=None):
+    """Get count of available vibes."""
+    if hour is None:
+        hour = datetime.now().hour
+    vibes = get_vibes_for_time(hour)
+    return len(vibes)
 
 # Activity categories
 ACTIVITIES = {

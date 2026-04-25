@@ -10,6 +10,8 @@ A proactive AI companion powered by local LLMs (phi4 via Ollama) that reaches ou
 - **Auto-pause**: Pauses automatic scheduling when appointments are set, resumes when they fire
 - **TUI Interface**: Terminal-based UI with urwid (sebastian_urwid.py)
 - **Cue System**: Response variation with character/personality injection
+- **Vibe Libraries**: Time-based personality variation (day/night vibes)
+- **Combinatorial System**: Mix intents + cues + vibes for unique conversations
 - **Robust Error Handling**: Graceful fallbacks when Ollama is unavailable
 - **Comprehensive Logging**: Full debug logging to `logs/sebastian.log`
 
@@ -114,6 +116,34 @@ You: How do I learn Python?
 Sebastian: [responds as MENTOR]
 ```
 
+### Vibe Libraries
+
+Sebastian has two vibe libraries for time-based personality variation:
+- **vibe_library_01.txt**: Day vibes (07:00-23:30)
+- **vibe_library_02.txt**: Night vibes (02:00-06:00 + Sunday)
+
+Each vibe is a character/personality that Sebastian can embody in his response.
+
+### Combinatorial System
+
+The trigger system combines three components for unique conversations:
+- **a**: Intent (topic from interaction_intents.txt)
+- **b**: Cue (personality from cue_categories.txt)
+- **c**: Vibe (time-based from vibe libraries)
+
+Random combinations:
+| Combo | Description |
+|-------|-------------|
+| a_only | Intent only (20%) |
+| b_only | Cue only (10%) |
+| c_only | Vibe only (15%) |
+| a_b | Intent + Cue (15%) |
+| a_c | Intent + Vibe (20%) |
+| b_c | Cue + Vibe (10%) |
+| a_b_c | All three (10%) |
+
+The vibe prompt uses "In your next response, ANSWER AS IF playing a character" language to ensure phi4 embodies the vibe rather than just mentioning it.
+
 ### Error Handling
 
 If Ollama connection fails:
@@ -132,10 +162,14 @@ sebastian/
 ├── time_parser.py           # Time parsing
 ├── intent_manager.py        # Intent handling
 ├── cue_manager.py           # Cue system
-├── interaction_intents.py   # Check-in phrases
-├── .env.example             # Config template
-├── requirements.txt         # Dependencies
-└── logs/                    # Auto-created, debug logs
+├── proactive_scheduler.py   # Proactive schedule generator
+├── interaction_intents.txt  # Check-in phrases
+├── cue_categories.txt       # Cue personalities
+├── vibe_library_01.txt    # Day vibes (07:00-23:30)
+├── vibe_library_02.txt     # Night vibes (02:00-06:00)
+├── .env.example            # Config template
+├── requirements.txt       # Dependencies
+└── logs/                  # Auto-created, debug logs
 ```
 
 The following directories are automatically created on first run:

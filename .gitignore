@@ -7,6 +7,8 @@
 *.json
 !interaction_intents.txt
 !special_dates.json
+!vibe_library_01.txt
+!vibe_library_02.txt
 
 # Backups & logs
 backup/
