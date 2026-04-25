@@ -859,12 +859,15 @@ def main():
     print()
     print("Commands:")
     print("  trigger    - Trigger proactive conversation")
-    print("  pause     - Pause auto-scheduler")
-    print("  resume    - Resume auto-scheduler")
-    print("  resume proactive - Enable proactive schedule")
-    print("  skip      - Skip current proactive contact")
+    print("  pause      - Pause auto-scheduler + proactive")
+    print("  pause auto - Pause auto-scheduler only")
+    print("  pause proactive - Pause proactive schedule only")
+    print("  resume     - Resume auto-scheduler + proactive")
+    print("  resume auto - Resume auto-scheduler only")
+    print("  resume proactive - Resume proactive schedule")
+    print("  skip       - Skip current proactive contact")
     print("  interval X - Set check interval to X minutes")
-    print("  status    - Show status (appointments + proactive)")
+    print("  status     - Show status (appointments + proactive)")
     print("  clear-schedule - Clear scheduled appointments")
     print("  clear-all  - Clear all data")
     print("  memory status - Show memory statistics")
@@ -938,7 +941,7 @@ def main():
             print("  trigger    - Trigger proactive conversation")
             print("  pause     - Pause auto-scheduler")
             print("  resume    - Resume auto-scheduler")
-            print("  resume proactive - Enable proactive schedule")
+            print("  resume proactive - Resume proactive schedule")
             print("  skip      - Skip current proactive contact")
             print("  interval X - Set check interval to X minutes")
             print("  status    - Show status (appointments + proactive)")
@@ -1019,7 +1022,17 @@ def main():
         if cmd == "pause":
             sched_module.pause_scheduler()
             os.environ["PROACTIVE_MODE"] = "false"
-            print("[Scheduler paused]")
+            print("[Auto-scheduler paused]")
+            print("[Proactive schedule paused]")
+            continue
+
+        if cmd == "pause auto":
+            sched_module.pause_scheduler()
+            print("[Auto-scheduler paused]")
+            continue
+
+        if cmd == "pause proactive":
+            os.environ["PROACTIVE_MODE"] = "false"
             print("[Proactive schedule paused]")
             continue
 
@@ -1028,9 +1041,14 @@ def main():
             proactive = get_proactive_status()
             if proactive:
                 os.environ["PROACTIVE_MODE"] = "true"
-            print("[Scheduler resumed]")
+            print("[Auto-scheduler resumed]")
             if proactive:
                 print("[Proactive schedule resumed]")
+            continue
+
+        if cmd == "resume auto":
+            sched_module.resume_scheduler(auto_trigger_handler)
+            print("[Auto-scheduler resumed]")
             continue
 
         if cmd == "resume proactive":
