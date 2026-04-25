@@ -95,13 +95,40 @@ def save_appointments(data):
 
 
 def get_pending_appointments():
+    """Get pending appointments that are due.
+    
+    Auto-completes old pending appointments that are past due.
+    Tracks completed count for info display.
+    """
     data = load_appointments()
     now = datetime.now()
     pending = []
+    completed_total = data.get("completed_count", 0)
+    
+    updated = False
     for appt in data.get("appointments", []):
-        if appt["status"] == "pending" and datetime.fromisoformat(appt["due"]) <= now:
-            pending.append(appt)
+        if appt["status"] == "pending":
+            due_time = datetime.fromisoformat(appt["due"])
+            if due_time <= now:
+                # Auto-complete old pending appointments
+                appt["status"] = "completed"
+                completed_total += 1
+                updated = True
+            else:
+                pending.append(appt)
+    
+    if updated:
+        data["completed_count"] = completed_total
+        save_appointments(data)
+        logger.info(f"Auto-completed old appointments. Total completed: {completed_total}")
+    
     return pending
+
+
+def get_completed_count():
+    """Get total count of completed appointments."""
+    data = load_appointments()
+    return data.get("completed_count", 0)
 
 
 def schedule_random_check():

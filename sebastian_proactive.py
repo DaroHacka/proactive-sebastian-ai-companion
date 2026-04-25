@@ -483,10 +483,8 @@ def create_appointment(source: str, description: str, due: str):
     data["appointments"].append(appointment)
     save_appointments(data)
 
-    # If manual appointment, pause auto-scheduler
-    if source == "ai_proposal" or source == "user":
-        sched_module.pause_scheduler()
-        print(f"[Scheduler paused for appointment: {appointment['id']}]")
+    # Note: Scheduler stays ON - user can manually pause with 'pause' command
+    # (Removed auto-pause behavior - was causing issues)
 
     return appointment
 
@@ -691,10 +689,11 @@ def main():
             pending = [
                 a for a in data.get("appointments", []) if a["status"] == "pending"
             ]
+            completed = data.get("completed_count", 0)
 
             print(f"\n[Status]")
-            print(f"  Appointments due: {len(appt)}")
-            print(f"  Pending: {len(pending)}")
+            print(f"  Appointments due: {len(pending)}")
+            print(f"  Completed: {completed}")
             print(
                 f"  Scheduler: interval={interval}min, auto={sched_module.is_enabled()}"
             )
@@ -702,7 +701,15 @@ def main():
             if pending:
                 print("  Pending appointments:")
                 for a in pending[:3]:
-                    print(f"    - {a['description'][:40]}... (due: {a['due'][:16]})")
+                    # Show relative time
+                    due = datetime.fromisoformat(a["due"])
+                    diff = due - datetime.now()
+                    if diff.total_seconds() < 0:
+                        time_str = "OVERDUE"
+                    else:
+                        mins = int(diff.total_seconds() / 60)
+                        time_str = f"{mins}min" if mins < 60 else f"{mins//60}h"
+                    print(f"    - {a['description'][:35]}... (due: {time_str})")
             continue
 
         if cmd == "trigger":
