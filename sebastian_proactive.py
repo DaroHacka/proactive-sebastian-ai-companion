@@ -44,7 +44,7 @@ _session_context = None
 
 RANDOM_INTERVALS = [2, 3, 4, 5, 6, 7, 8, 12, 24]
 
-SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. You are a caring friend who checks in on him from time to time. Speak naturally as an old friend would - never mention you are an AI. Keep responses short and conversational."""
+SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. You are a caring friend who checks in on him from time to time. Speak naturally as an old friend would - never mention you are an AI[...]
 
 TRIGGER_CONVERSATION_PROMPT = """You are Sebastian, a caring AI companion to Elias.
 
@@ -390,16 +390,20 @@ def auto_trigger_handler(reason):
 
 
 def background_scheduler():
-    """Background thread that checks for due appointments/events."""
+    """Background thread that checks for due appointments/events.
+    
+    FIXED: Now properly runs the scheduler queue instead of just polling.
+    This ensures proactive triggers fire reliably at the scheduled intervals.
+    """
+    if sched_module.is_enabled():
+        sched_module.start_scheduler(auto_trigger_handler)
+    
     while True:
-        # Check scheduler is enabled
-        if sched_module.is_enabled():
-            # Check for due appointments or random checks
-            sched_module.check_and_trigger(auto_trigger_handler)
-
-        # Sleep for configured interval (from .env or default 5 minutes)
-        interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", 5))
-        time.sleep(interval * 60)
+        # Run any pending events from the scheduler queue
+        sched_module.run_pending(blocking=False)
+        
+        # Small sleep to prevent busy-waiting
+        time.sleep(1)
 
 
 def trigger_conversation() -> str:
