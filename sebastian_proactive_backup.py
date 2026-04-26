@@ -685,31 +685,6 @@ def get_pending_appointments() -> list:
     return pending
 
 
-# Auto-expire appointments that are past due by more than 30 minutes
-APPOINTMENT_EXPIRE_MINUTES = 30
-
-
-def auto_expire_appointments():
-    """Auto-expire appointments that are past due by more than APPOINTMENT_EXPIRE_MINUTES."""
-    data = load_appointments()
-    now = datetime.now()
-    expired_count = 0
-    
-    for appt in data.get("appointments", []):
-        if appt["status"] == "pending":
-            due = datetime.fromisoformat(appt["due"])
-            minutes_past = (now - due).total_seconds() / 60
-            if minutes_past > APPOINTMENT_EXPIRE_MINUTES:
-                appt["status"] = "expired"
-                expired_count += 1
-    
-    if expired_count > 0:
-        save_appointments(data)
-        print(f"[Auto-expired {expired_count} old appointments]")
-    
-    return expired_count
-
-
 def schedule_random_check():
     data = load_appointments()
     hours = random.choice(RANDOM_INTERVALS)
@@ -741,9 +716,6 @@ def background_scheduler():
     The check_and_trigger() function handles both appointments and random checks.
     """
     while True:
-        # Auto-expire old appointments (every iteration)
-        auto_expire_appointments()
-        
         if sched_module.is_enabled():
             sched_module.check_and_trigger(auto_trigger_handler)
         
@@ -932,9 +904,6 @@ def main():
     
     print("[Auto-scheduler PAUSED - use 'resume auto' to enable]")
     print()
-    
-    # Auto-expire old appointments on startup
-    auto_expire_appointments()
 
     # Start background scheduler for proactive triggers
     # (Auto-scheduler runs in same thread, so only start if enabled)
