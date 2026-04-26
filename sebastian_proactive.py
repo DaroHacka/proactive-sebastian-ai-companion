@@ -739,10 +739,23 @@ def background_scheduler():
     
     Uses direct polling approach (like original) - simpler and more reliable.
     The check_and_trigger() function handles both appointments and random checks.
+    
+    IMPORTANT: First run has a grace period before proactive triggers.
     """
+    first_run = True
+    grace_period_seconds = 60  # 1 minute grace period before first proactive check
+    
     while True:
         # Auto-expire old appointments (every iteration)
         auto_expire_appointments()
+        
+        if first_run:
+            # Grace period on first run - wait before checking anything
+            time.sleep(grace_period_seconds)
+            first_run = False
+            # After grace period, do initial check but don't trigger proactively on first run
+            # (user can still manually type 'trigger')
+            continue
         
         if sched_module.is_enabled():
             sched_module.check_and_trigger(auto_trigger_handler)
@@ -752,7 +765,7 @@ def background_scheduler():
             proactive_trigger()
         
         # Sleep for configured interval (from .env or default 5 minutes)
-        interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", 5))
+        interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "5"))
         time.sleep(interval * 60)
 
 
