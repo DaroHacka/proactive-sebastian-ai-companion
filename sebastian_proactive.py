@@ -888,25 +888,31 @@ def main():
     # Initialize automatic schedule on launch - clears stale random_check
     sched_module.initialize_automatic_schedule()
     
-    # Initialize proactive schedule (monthly)
+# Initialize proactive schedule (monthly)
     proactive_status = initialize_proactive_schedule()
     
     auto_enabled = os.getenv("AUTOMATIC_ENABLED", "false").lower() == "true"
+    proactive_enabled = os.getenv("PROACTIVE_MODE", "false").lower() == "true"
+    
+    pending_count = proactive_status.get('stats', {}).get('pending', 0)
+    proactive_state = "ACTIVE" if proactive_enabled else "PAUSED"
 
-    print(f"[Scheduler: {interval}min interval, auto={auto_enabled}]")
-    print(f"[Proactive schedule: {proactive_status.get('month', 'N/A')}, {proactive_status.get('stats', {}).get('pending', 0)} contacts pending]")
+    print(f"[Scheduler: {interval}min interval, auto={'ON' if auto_enabled else 'PAUSED'}]")
+    print(f"[Proactive schedule: {proactive_status.get('month', 'N/A')}, {pending_count} contacts {proactive_state}]")
     if TEST_MODE:
         print("[TEST MODE: enabled - rapid triggering]")
+    
+    print("[Auto-scheduler PAUSED - use 'resume auto' to enable]")
+    print()
 
-    if auto_enabled:
-        # Start background scheduler thread
+    # Start background scheduler for proactive triggers
+    # (Auto-scheduler runs in same thread, so only start if enabled)
+    if PROACTIVE_MODE:
         thread = threading.Thread(target=background_scheduler, daemon=True)
         thread.start()
 
+    # Main loop - auto-scheduler paused, proactive active (if PROACTIVE_MODE=true)
     while True:
-        # Check due appointments immediately on each iteration
-        sched_module.check_and_trigger(auto_trigger_handler)
-
         user_input = input("\nYou: ").strip()
 
         if not user_input:
