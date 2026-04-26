@@ -814,10 +814,13 @@ def trigger_proactive_conversation(contact) -> str:
     except:
         scheduled_hour = datetime.now().hour
     
-    # Get conversation context
-    context = get_conversation_context(num_recent=5)
-    if context:
-        context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
+    # Get conversation context (only if MEMORY_IN_PROMPT is enabled)
+    if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+        context = get_conversation_context(num_recent=5)
+        if context:
+            context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
+        else:
+            context_str = f"Activity: {activity}"
     else:
         context_str = f"Activity: {activity}"
     
@@ -862,10 +865,13 @@ def trigger_proactive_conversation(contact) -> str:
 
 def trigger_conversation() -> str:
     """Generate a proactive conversation starter using combinatorial system."""
-    context = get_conversation_context(num_recent=5)
-
-    if context:
-        context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
+    # Get conversation context (only if MEMORY_IN_PROMPT is enabled)
+    if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+        context = get_conversation_context(num_recent=5)
+        if context:
+            context_str = "\n".join([f"{m['role']}: {m['content']}" for m in context[-5:]])
+        else:
+            context_str = "No recent context available."
     else:
         context_str = "No recent context available."
 
@@ -1219,10 +1225,24 @@ def main():
 
         if cmd == "memory status":
             stats = get_memory_status()
+            memory_in_prompt = os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true"
             print(f"\n[Memory Status]")
             print(f"  Fresh: {stats['fresh']} entries")
             print(f"  Medium: {stats['medium']} entries")
             print(f"  Long-term: {stats['longterm']} entries")
+            print(f"  In prompts: {'ON' if memory_in_prompt else 'OFF'}")
+            continue
+
+        if cmd == "memory on":
+            os.environ["MEMORY_IN_PROMPT"] = "true"
+            print("[Memory in prompts: ON]")
+            print("[Recent: includes last 5 user messages]")
+            continue
+
+        if cmd == "memory off":
+            os.environ["MEMORY_IN_PROMPT"] = "false"
+            print("[Memory in prompts: OFF]")
+            print("[Recent: not included in prompts]")
             continue
 
         if cmd == "medium memory":
