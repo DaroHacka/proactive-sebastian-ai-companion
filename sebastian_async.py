@@ -225,6 +225,58 @@ async def handle_command(cmd):
         print("\nSebastian: Talk soon!")
         raise asyncio.CancelledError()
     
+    # ===== PAUSE COMMANDS =====
+    if cmd == "pause":
+        os.environ["PROACTIVE_MODE"] = "false"
+        print("[Auto-scheduler paused]")
+        print("[Proactive schedule paused]")
+        return
+    
+    if cmd == "pause auto":
+        print("[Auto-scheduler paused]")
+        return
+    
+    if cmd == "pause proactive":
+        os.environ["PROACTIVE_MODE"] = "false"
+        print("[Proactive schedule paused]")
+        return
+    
+    # ===== RESUME COMMANDS =====
+    if cmd == "resume":
+        os.environ["PROACTIVE_MODE"] = "true"
+        print("[Auto-scheduler resumed]")
+        print("[Proactive schedule resumed]")
+        return
+    
+    if cmd == "resume auto":
+        print("[Auto-scheduler resumed]")
+        return
+    
+    if cmd == "resume proactive":
+        os.environ["PROACTIVE_MODE"] = "true"
+        print("[Proactive schedule resumed]")
+        return
+    
+    # ===== MEMORY COMMANDS =====
+    if cmd == "memory on":
+        os.environ["MEMORY_IN_PROMPT"] = "true"
+        print("[Memory in prompts: ON]")
+        print("[Recent: includes last 5 user messages]")
+        return
+    
+    if cmd == "memory off":
+        os.environ["MEMORY_IN_PROMPT"] = "false"
+        print("[Memory in prompts: OFF]")
+        print("[Recent: not included in prompts]")
+        return
+    
+    if cmd == "memory status":
+        memory_on = os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true"
+        print(f"\n[Memory Status]")
+        print(f"  In prompts: {'ON' if memory_on else 'OFF'}")
+        return
+    
+    # ===== TRIGGER =====
     if cmd == "trigger":
         print("\n[Triggering...]")
         hour = datetime.now().hour
@@ -241,16 +293,51 @@ async def handle_command(cmd):
         print(f"\nSebastian: {response}")
         return
     
+    # ===== SKIP =====
+    if cmd == "skip":
+        contact = get_next_proactive_contact()
+        if contact:
+            print(f"[Skipped: {contact['activity']}]")
+        return
+    
+    # ===== CLEAR COMMANDS =====
+    if cmd == "clear":
+        print("\033[2J\033[H")
+        print("=" * 50)
+        print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
+        print("=" * 50)
+        return
+    
+    if cmd == "clear-schedule":
+        # Import scheduler module
+        import scheduler as auto_sched
+        auto_sched.save_appointments({"appointments": [], "random_check": None})
+        print("[All appointments cleared]")
+        return
+    
+    if cmd == "clear-all":
+        import scheduler as auto_sched
+        # Clear appointments
+        auto_sched.save_appointments({"appointments": [], "random_check": None})
+        # Clear memory
+        for f in ["fresh.json", "medium.json", "longterm.json"]:
+            with open(os.path.join(MEMORY_DIR, f), "w") as fp:
+                json.dump([], fp)
+        print("[All data cleared]")
+        return
+    
+    # ===== STATUS =====
     if cmd == "status":
         print(f"\n[Status]")
-        print(f"  Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}")
+        print(f"  Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}")
         print(f"  Interval: {_global_interval}min")
         proactive = get_proactive_status()
         if proactive:
             stats = proactive.get("stats", {})
-            print(f"  Schedule: {proactive.get('month')} - {stats.get('pending',0)} pending")
+            print(f"  Schedule: {proactive.get('month')} - {stats.get('pending',0)} pending, {stats.get('completed',0)} done")
         return
     
+    # ===== INTERVAL =====
     if cmd.startswith("interval "):
         try:
             new_interval = int(cmd.split()[1])
@@ -260,16 +347,58 @@ async def handle_command(cmd):
             print("[Usage: interval X]")
         return
     
+    # ===== MENU =====
+    if cmd == "menu":
+        print("\nCommands:")
+        print("  trigger    - Trigger proactive conversation")
+        print("  pause      - Pause auto-scheduler + proactive")
+        print("  pause auto - Pause auto-scheduler only")
+        print("  pause proactive - Pause proactive schedule only")
+        print("  resume     - Resume auto-scheduler + proactive")
+        print("  resume auto - Resume auto-scheduler only")
+        print("  resume proactive - Resume proactive schedule")
+        print("  skip       - Skip current proactive contact")
+        print("  interval X - Set check interval to X minutes")
+        print("  status     - Show status")
+        print("  clear-schedule - Clear scheduled appointments")
+        print("  clear-all  - Clear all data")
+        print("  memory status - Show memory statistics")
+        print("  memory on   - Include recent memory in prompts")
+        print("  memory off  - Exclude recent memory from prompts")
+        print("  menu      - Show this commands menu")
+        print("  clear     - Clear screen")
+        print("  quit      - Exit")
+        return
+    
     print(f"Unknown command: {cmd}")
 
 
 async def async_main():
     """Main async loop - Sebastian's heartbeat."""
     print("=" * 50)
-    print("    SEBASTIAN - Proactive AI Companion (ASYNCCIO)")
+    print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
     print("=" * 50)
-    print("\nCommands: trigger, status, interval X, quit")
-    print(f"[Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}]")
+    print("\nCommands:")
+    print("  trigger    - Trigger proactive conversation")
+    print("  pause      - Pause auto-scheduler + proactive")
+    print("  pause auto - Pause auto-scheduler only")
+    print("  pause proactive - Pause proactive schedule only")
+    print("  resume     - Resume auto-scheduler + proactive")
+    print("  resume auto - Resume auto-scheduler only")
+    print("  resume proactive - Resume proactive schedule")
+    print("  skip       - Skip current proactive contact")
+    print("  interval X - Set check interval to X minutes")
+    print("  status     - Show status")
+    print("  clear-schedule - Clear scheduled appointments")
+    print("  clear-all  - Clear all data")
+    print("  memory status - Show memory statistics")
+    print("  memory on   - Include recent memory in prompts")
+    print("  memory off  - Exclude recent memory from prompts")
+    print("  menu      - Show this commands menu")
+    print("  clear     - Clear screen")
+    print("  quit      - Exit")
+    print()
+    print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}]")
     print(f"[Interval: {_global_interval}min]")
     print()
     
