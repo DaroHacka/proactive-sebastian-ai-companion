@@ -412,6 +412,38 @@ def get_next_proactive_contact():
     now = datetime.now()
     updated = False
     
+    # Find next pending contact that's due (must be due now or overdue)
+    for contact in schedule.get("schedule", []):
+        if contact["status"] == "pending":
+            due = datetime.fromisoformat(contact["due"])
+            # Only return if actually due now or overdue
+            if due <= now:
+                return contact
+    
+    return None
+
+
+def get_all_due_proactive_contacts():
+    """Get ALL proactive contacts that are due now or overdue."""
+    schedule = load_proactive_schedule()
+    
+    if not schedule:
+        return []
+    
+    now = datetime.now()
+    due_contacts = []
+    
+    for contact in schedule.get("schedule", []):
+        if contact["status"] == "pending":
+            due = datetime.fromisoformat(contact["due"])
+            if due <= now:
+                due_contacts.append(contact)
+    
+    return due_contacts
+    
+    now = datetime.now()
+    updated = False
+    
     # Find next pending contact that's due (must be due now or in the past)
     for contact in schedule.get("schedule", []):
         if contact["status"] == "pending":

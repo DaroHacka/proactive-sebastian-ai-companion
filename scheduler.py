@@ -120,7 +120,7 @@ def get_pending_appointments():
     if updated:
         data["completed_count"] = completed_total
         save_appointments(data)
-        logger.info(f"Auto-completed old appointments. Total completed: {completed_total}")
+        logger.debug(f"Auto-completed old appointments. Total completed: {completed_total}")
     
     return pending
 

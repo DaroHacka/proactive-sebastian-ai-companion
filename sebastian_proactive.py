@@ -58,6 +58,7 @@ from cue_manager import get_random_cue
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
+    get_all_due_proactive_contacts,
     complete_proactive_contact,
     get_proactive_status,
     load_vibe_library,
@@ -125,18 +126,26 @@ def build_combinatorial_prompt(context_str=None, hour=None):
 
 # ==================== OLLAMA ====================
 _session_context = None
+state_lock = asyncio.Lock()
 
-def send_to_ollama(prompt):
+async def send_to_ollama(prompt):
     global _session_context
     try:
         payload = {"model": MODEL, "prompt": prompt, "stream": False}
-        if _session_context:
-            payload["context"] = _session_context
-        response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=500)
-        response.raise_for_status()
-        result = response.json()
-        if "context" in result:
-            _session_context = result["context"]
+        async with state_lock:
+            if _session_context:
+                payload["context"] = _session_context
+        
+        def _call():
+            response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=500)
+            response.raise_for_status()
+            return response.json()
+        
+        result = await asyncio.to_thread(_call)
+        
+        async with state_lock:
+            if "context" in result:
+                _session_context = result["context"]
         return result["response"]
     except Exception as e:
         logger.error(f"Ollama error: {e}")
@@ -149,20 +158,22 @@ async def proactive_monitor():
     first_run = True
     while True:
         if first_run:
-            await asyncio.sleep(60)  # Grace period
+            await asyncio.sleep(30)  # Grace period
             first_run = False
             continue
         
-        if PROACTIVE_MODE:
+        # Check PROACTIVE_MODE at RUNTIME, not import time
+        if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true':
             await check_proactive()
         
-        await asyncio.sleep(_global_interval * 60)
+        await asyncio.sleep(30)  # Check every 30 seconds
 
 
 async def check_proactive():
-    """Check and trigger if contact is due."""
-    contact = get_next_proactive_contact()
-    if contact:
+    """Check and trigger ALL contacts that are due."""
+    contacts = get_all_due_proactive_contacts()
+    
+    for contact in contacts:
         print(f"\n[Proactive: {contact['activity']}]")
         
         hour = datetime.now().hour
@@ -176,7 +187,7 @@ async def check_proactive():
         prompt = build_combinatorial_prompt(context_str=context, hour=hour)
         save_prompt_to_log(prompt, "scheduled")
         
-        response = send_to_ollama(prompt)
+        response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
         complete_proactive_contact(contact["id"])
 
@@ -192,12 +203,64 @@ async def vibe_monitor():
             last_hour = current_hour
 
 
-async def appointment_monitor():
-    """Monitors due appointments."""
+def get_due_appointments():
+    """Get all appointments that are due from appointments.json."""
+    try:
+        data = sched_module.load_appointments()
+        now = datetime.now()
+        due = []
+        for appt in data.get("appointments", []):
+            if appt.get("status") == "pending":
+                due_time = datetime.fromisoformat(appt["due"])
+                if due_time <= now:
+                    due.append(appt)
+        return due
+    except:
+        return []
+
+
+def complete_appointment(appt_id):
+    """Mark an appointment as completed."""
+    try:
+        data = sched_module.load_appointments()
+        for appt in data.get("appointments", []):
+            if appt.get("id") == appt_id:
+                appt["status"] = "completed"
+                break
+        sched_module.save_appointments(data)
+    except:
+        pass
+
+
+async def appointment_check_loop():
+    """Monitors appointments.json for due appointments."""
     while True:
-        await asyncio.sleep(10)
-        # Check appointments (sync call in thread pool)
-        await asyncio.to_thread(sched_module.check_and_trigger, lambda r: print(f"\n[Auto: {r}]"))
+        await asyncio.sleep(30)
+        
+        # Check APPOINTMENT_MODE at runtime
+        if os.getenv('APPOINTMENT_MODE', 'true').lower() != 'true':
+            continue
+        
+        # Check for due appointments
+        appts = get_due_appointments()
+        
+        for appt in appts:
+            print(f"\n[Appointment: {appt.get('description', appt.get('activity', 'check-in'))[:50]}...]")
+            
+            hour = datetime.now().hour
+            context = "Activity: " + appt.get("description", appt.get("activity", "check-in"))
+            
+            if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+                recent = load_conversations()
+                if recent:
+                    context = "\n".join([f"{m.get('role','')}: {m.get('content','')}" for m in recent[-3:]])
+            
+            prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+            save_prompt_to_log(prompt, "appointment")
+            
+            response = await send_to_ollama(prompt)
+            print(f"\nSebastian: {response}")
+            complete_appointment(appt.get("id"))
 
 
 async def user_input_loop():
@@ -210,7 +273,7 @@ async def user_input_loop():
                 continue
             user_input = user_input.strip()
             await handle_command(user_input)
-        except (asyncio.CancelledError, EOFError, KeyboardInterrupt):
+        except (EOFError, KeyboardInterrupt):
             break
         except Exception as e:
             # Skip other input errors silently
@@ -241,6 +304,11 @@ async def handle_command(cmd):
         print("[Proactive schedule paused]")
         return
     
+    if cmd == "pause appointment":
+        os.environ["APPOINTMENT_MODE"] = "false"
+        print("[Appointment check paused]")
+        return
+    
     # ===== RESUME COMMANDS =====
     if cmd == "resume":
         os.environ["PROACTIVE_MODE"] = "true"
@@ -255,6 +323,11 @@ async def handle_command(cmd):
     if cmd == "resume proactive":
         os.environ["PROACTIVE_MODE"] = "true"
         print("[Proactive schedule resumed]")
+        return
+    
+    if cmd == "resume appointment":
+        os.environ["APPOINTMENT_MODE"] = "true"
+        print("[Appointment check resumed]")
         return
     
     # ===== MEMORY COMMANDS =====
@@ -280,6 +353,24 @@ async def handle_command(cmd):
     if cmd == "trigger":
         print("\n[Triggering...]")
         hour = datetime.now().hour
+        
+        # Get combo and components for display
+        combo = select_combination()
+        intent = get_random_intent() if "a" in combo else None
+        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+        vibe = get_random_vibe(hour) if "c" in combo else None
+        
+        # Show what was picked
+        print(f"Combination: {combo}")
+        if intent:
+            print(f" Intent: {intent[:60]}...")
+        if cue_code:
+            print(f" Cue: {cue_code}")
+        if vibe:
+            library = "day" if hour >= 6 else "night"
+            print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+        
+        # Build context and prompt
         context = "Activity: manual trigger"
         if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
             recent = load_conversations()
@@ -289,7 +380,7 @@ async def handle_command(cmd):
         prompt = build_combinatorial_prompt(context_str=context, hour=hour)
         save_prompt_to_log(prompt, "trigger")
         
-        response = send_to_ollama(prompt)
+        response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
         return
     
@@ -330,11 +421,44 @@ async def handle_command(cmd):
     if cmd == "status":
         print(f"\n[Status]")
         print(f"  Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}")
-        print(f"  Interval: {_global_interval}min")
+        
+        # Appointment check status
+        appt_mode = os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true'
+        print(f"  Appointment: {'ON' if appt_mode else 'OFF'}")
+        
+        # Auto scheduler status from scheduler module
+        auto_status = "PAUSED"
+        try:
+            if sched_module.is_enabled():
+                auto_status = "ON"
+        except:
+            pass
+        print(f"  Auto: {auto_status}")
+        print(f"  Interval: 30sec")
+        
+        # Next from proactive_schedule.json
         proactive = get_proactive_status()
         if proactive:
             stats = proactive.get("stats", {})
-            print(f"  Schedule: {proactive.get('month')} - {stats.get('pending',0)} pending, {stats.get('completed',0)} done")
+            print(f"  Proactive: {proactive.get('month')} - {stats.get('pending',0)} pending, {stats.get('completed',0)} done")
+        
+        # Next from appointments.json
+        try:
+            data = sched_module.load_appointments()
+            now = datetime.now()
+            upcoming = []
+            for appt in data.get("appointments", []):
+                if appt.get("status") == "pending":
+                    due = datetime.fromisoformat(appt["due"])
+                    if due > now:
+                        upcoming.append({"id": appt["id"], "due": appt["due"], "activity": appt.get("description", appt.get("activity", "check-in"))[:30]})
+            if upcoming:
+                upcoming.sort(key=lambda x: x["due"])
+                next_appt = upcoming[0]
+                due_dt = datetime.fromisoformat(next_appt["due"])
+                print(f"  Next Appointment: {due_dt.strftime('%Y-%m-%d %H:%M')} (id={next_appt['id']}, {next_appt['activity'][:30]}...)")
+        except Exception as e:
+            pass
         return
     
     # ===== INTERVAL =====
@@ -354,9 +478,11 @@ async def handle_command(cmd):
         print("  pause      - Pause auto-scheduler + proactive")
         print("  pause auto - Pause auto-scheduler only")
         print("  pause proactive - Pause proactive schedule only")
+        print("  pause appointment - Pause appointment check")
         print("  resume     - Resume auto-scheduler + proactive")
         print("  resume auto - Resume auto-scheduler only")
         print("  resume proactive - Resume proactive schedule")
+        print("  resume appointment - Resume appointment check")
         print("  skip       - Skip current proactive contact")
         print("  interval X - Set check interval to X minutes")
         print("  status     - Show status")
@@ -370,7 +496,9 @@ async def handle_command(cmd):
         print("  quit      - Exit")
         return
     
-    print(f"Unknown command: {cmd}")
+    # Unknown command: send to AI as free text
+    response = await send_to_ollama(cmd)
+    print(f"\nSebastian: {response}")
 
 
 async def async_main():
@@ -383,9 +511,11 @@ async def async_main():
     print("  pause      - Pause auto-scheduler + proactive")
     print("  pause auto - Pause auto-scheduler only")
     print("  pause proactive - Pause proactive schedule only")
+    print("  pause appointment - Pause appointment check")
     print("  resume     - Resume auto-scheduler + proactive")
     print("  resume auto - Resume auto-scheduler only")
     print("  resume proactive - Resume proactive schedule")
+    print("  resume appointment - Resume appointment check")
     print("  skip       - Skip current proactive contact")
     print("  interval X - Set check interval to X minutes")
     print("  status     - Show status")
@@ -399,17 +529,26 @@ async def async_main():
     print("  quit      - Exit")
     print()
     print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}]")
+    print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
     print(f"[Interval: {_global_interval}min]")
     print()
     
+    tasks = [
+        asyncio.create_task(proactive_monitor()),
+        asyncio.create_task(vibe_monitor()),
+        asyncio.create_task(appointment_check_loop()),
+        asyncio.create_task(user_input_loop()),
+    ]
+    
     try:
-        await asyncio.gather(
-            proactive_monitor(),
-            vibe_monitor(),
-            user_input_loop(),
-        )
+        await asyncio.gather(*tasks)
     except asyncio.CancelledError:
-        print("\nStopping...")
+        pass
+    finally:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        print("[Done]")
 
 
 def main():
