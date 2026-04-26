@@ -403,7 +403,7 @@ def initialize_proactive_schedule():
 
 
 def get_next_proactive_contact():
-    """Get the next proactive contact due."""
+    """Get the next proactive contact that's due now or in the past."""
     schedule = load_proactive_schedule()
     
     if not schedule:
@@ -412,12 +412,13 @@ def get_next_proactive_contact():
     now = datetime.now()
     updated = False
     
-    # Find next pending contact that's due
+    # Find next pending contact that's due (must be due now or in the past)
     for contact in schedule.get("schedule", []):
         if contact["status"] == "pending":
             due = datetime.fromisoformat(contact["due"])
-            # Return the next pending contact (regardless of whether it's due now or in future)
-            return contact
+            # Only return if actually due now or overdue
+            if due <= now:
+                return contact
     
     return None
 

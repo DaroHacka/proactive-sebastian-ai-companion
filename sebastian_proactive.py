@@ -60,6 +60,7 @@ CUE_PROBABILITY = float(os.getenv("CUE_PROBABILITY", "0.2"))  # 20% default
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 MODEL = os.getenv("COMPANION_MODEL", "phi4")
 MEMORY_DIR = "memory"
+PROMPT_LOG_DIR = "prompt-to-AI-logs"
 STATE_FILE = "state.json"
 LAST_INTERACTION_FILE = "last_interaction.json"
 APPOINTMENTS_FILE = "appointments.json"
@@ -291,6 +292,26 @@ def ensure_memory_dir():
         for f in ["fresh.json", "medium.json", "longterm.json"]:
             with open(os.path.join(MEMORY_DIR, f), "w") as fp:
                 json.dump([], fp)
+
+
+def save_prompt_to_log(prompt: str, source: str):
+    """Save prompt to log file for studying.
+    
+    Args:
+        prompt: The prompt sent to AI
+        source: One of 'trigger' (manual), 'scheduled' (proactive), 'user' (direct message)
+    """
+    if not os.path.exists(PROMPT_LOG_DIR):
+        os.makedirs(PROMPT_LOG_DIR)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"prompt_{timestamp}_{source}.txt"
+    filepath = os.path.join(PROMPT_LOG_DIR, filename)
+    
+    with open(filepath, "w") as f:
+        f.write(prompt)
+    
+    return filepath
 
 
 def save_last_interaction(timestamp):
@@ -828,6 +849,9 @@ def trigger_proactive_conversation(contact) -> str:
     # Build prompt using pre-selected combo and components
     prompt = build_combinatorial_prompt(combo_type=combo, intent=intent, cue_desc=cue_desc, vibe=vibe, context_str=context_str, hour=scheduled_hour)
     
+    # Save prompt for study
+    save_prompt_to_log(prompt, "scheduled")
+    
     try:
         response = send_to_ollama(prompt)
         return response
@@ -872,6 +896,9 @@ def trigger_conversation() -> str:
 
     # Build prompt using pre-selected combo and components
     prompt = build_combinatorial_prompt(combo_type=combo, intent=intent, cue_desc=cue_desc, vibe=vibe, context_str=context_str)
+    
+    # Save prompt for study
+    save_prompt_to_log(prompt, "trigger")
 
     try:
         response = send_to_ollama(prompt)

@@ -13,6 +13,7 @@
 # Backups & logs
 backup/
 *.log
+prompt-to-AI-logs/
 sebastian.log
 
 # Implementation notes & workflow plans
