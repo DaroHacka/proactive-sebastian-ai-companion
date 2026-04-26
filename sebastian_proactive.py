@@ -73,6 +73,29 @@ COMBINATION_WEIGHTS = {
 
 SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short."""
 
+# Load prompt template from file
+PROMPT_TEMPLATE_FILE = "prompt_template.txt"
+_template_cache = {}
+
+def load_prompt_template():
+    """Load prompt template components from file."""
+    global _template_cache
+    if _template_cache:
+        return _template_cache
+    
+    try:
+        if os.path.exists(PROMPT_TEMPLATE_FILE):
+            with open(PROMPT_TEMPLATE_FILE, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if "=" in line and not line.startswith("#"):
+                        key, value = line.split("=", 1)
+                        _template_cache[key.strip()] = value.strip()
+    except:
+        pass
+    
+    return _template_cache
+
 
 def select_combination():
     r = random.random()
@@ -107,21 +130,62 @@ def build_combinatorial_prompt(context_str=None, hour=None):
     if context_str is None:
         context_str = "Activity: general chat"
     
+    # Load template
+    template = load_prompt_template()
+    
+    # Get identity and style from template (with fallbacks)
+    identity = template.get("SYSTEM_IDENTITY", "You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short.")
+    proactive = template.get("PROACTIVE_INSTRUCTION", "")
+    style = template.get("STYLE_GUIDELINES", "Keep responses short and conversational.")
+    anti = template.get("ANTI_PATTERNS", "Do NOT say things like 'that's a great question'")
+    length = template.get("LENGTH", "Keep it short and natural (1-2 sentences)")
+    context_instr = template.get("RECENT_CONTEXT_INSTRUCTION", "Consider recent context from memory: {recent_context}")
+    
     combo = select_combination()
     intent = get_random_intent()
     cue_code, cue_desc, _ = get_random_cue()
     vibe = get_random_vibe(hour)
     
+    # Build task instructions based on combo
     prompts = {
-        "a_only": f"""Your task: Pick up this topic: "{intent}". Start a natural conversation. Context: {context_str}""",
-        "b_only": f"""Your task: You are playing as: "{cue_desc}". Start a conversation. Context: {context_str}""",
-        "c_only": f"""Your task: In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Context: {context_str}""",
-        "a_b": f"""Your task: Pick up this topic: "{intent}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_c": f"""Your task: In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also: "{intent}". Context: {context_str}""",
-        "b_c": f"""Your task: In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_b_c": f"""Your task: Topic: "{intent}", vibe: "{vibe['text']}", cue: "{cue_desc}". Context: {context_str}""",
+        "a_only": f"""Pick up this topic: "{intent}". Start a natural conversation. Context: {context_str}""",
+        "b_only": f"""You are playing as: "{cue_desc}". Start a conversation. Context: {context_str}""",
+        "c_only": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Context: {context_str}""",
+        "a_b": f"""Pick up this topic: "{intent}". Also playing as: "{cue_desc}". Context: {context_str}""",
+        "a_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also: "{intent}". Context: {context_str}""",
+        "b_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also playing as: "{cue_desc}". Context: {context_str}""",
+        "a_b_c": f"""Topic: "{intent}", vibe: "{vibe['text']}", cue: "{cue_desc}". Context: {context_str}""",
     }
-    return prompts.get(combo, prompts["a_only"])
+    task_instructions = prompts.get(combo, prompts["a_only"])
+    
+    # Replace {recent_context} placeholder if present in context
+    recent_context = ""
+    if "user_message" in context_str or "ai_message" in context_str:
+        recent_context = context_str
+        context_instr = ""
+    
+    # Build full prompt with all components
+    prompt_parts = [identity]
+    
+    if proactive:
+        prompt_parts.append(proactive)
+    
+    prompt_parts.append(f"Your task:\n{task_instructions}")
+    
+    if style:
+        prompt_parts.append(style)
+    if anti:
+        prompt_parts.append(anti)
+    if length:
+        prompt_parts.append(length)
+    if context_instr and recent_context:
+        prompt_parts.append(context_instr.format(recent_context=recent_context))
+    elif recent_context:
+        prompt_parts.append(f"Recent context: {recent_context}")
+    
+    prompt_parts.append("Create your message now:")
+    
+    return "\n\n".join(prompt_parts)
 
 
 # ==================== OLLAMA ====================
@@ -174,15 +238,32 @@ async def check_proactive():
     contacts = get_all_due_proactive_contacts()
     
     for contact in contacts:
-        print(f"\n[Proactive: {contact['activity']}]")
-        
         hour = datetime.now().hour
+        
+        # Get combo and components for display
+        combo = select_combination()
+        intent = get_random_intent() if "a" in combo else None
+        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+        vibe = get_random_vibe(hour) if "c" in combo else None
+        
+        # Show what was picked
+        print(f"\n[Proactive: {contact['activity']}]")
+        print(f"Combination: {combo}")
+        if intent:
+            print(f" Intent: {intent[:60]}...")
+        if cue_code:
+            print(f" Cue: {cue_code}")
+        if vibe:
+            library = "day" if hour >= 6 else "night"
+            print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+        
+        # Build context
         context = "Activity: " + contact.get("activity", "chat")
         
         if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
             recent = load_conversations()
             if recent:
-                context = "\n".join([f"{m.get('role','')}: {m.get('content','')}" for m in recent[-3:]])
+                context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
         
         prompt = build_combinatorial_prompt(context_str=context, hour=hour)
         save_prompt_to_log(prompt, "scheduled")
@@ -253,7 +334,7 @@ async def appointment_check_loop():
             if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
                 recent = load_conversations()
                 if recent:
-                    context = "\n".join([f"{m.get('role','')}: {m.get('content','')}" for m in recent[-3:]])
+                    context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
             
             prompt = build_combinatorial_prompt(context_str=context, hour=hour)
             save_prompt_to_log(prompt, "appointment")
@@ -375,7 +456,7 @@ async def handle_command(cmd):
         if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
             recent = load_conversations()
             if recent:
-                context = "\n".join([f"{m.get('role','')}: {m.get('content','')}" for m in recent[-3:]])
+                context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
         
         prompt = build_combinatorial_prompt(context_str=context, hour=hour)
         save_prompt_to_log(prompt, "trigger")
