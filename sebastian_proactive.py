@@ -415,10 +415,6 @@ async def handle_command(cmd):
         print("[Proactive schedule paused]")
         return
     
-    if cmd == "pause auto":
-        print("[Auto-scheduler paused]")
-        return
-    
     if cmd == "pause proactive":
         os.environ["PROACTIVE_MODE"] = "false"
         print("[Proactive schedule paused]")
@@ -434,10 +430,6 @@ async def handle_command(cmd):
         os.environ["PROACTIVE_MODE"] = "true"
         print("[Auto-scheduler resumed]")
         print("[Proactive schedule resumed]")
-        return
-    
-    if cmd == "resume auto":
-        print("[Auto-scheduler resumed]")
         return
     
     if cmd == "resume proactive":
@@ -597,16 +589,6 @@ async def handle_command(cmd):
         appt_mode = os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true'
         print(f"  Appointment: {'ON' if appt_mode else 'OFF'}")
         
-        # Auto scheduler status from scheduler module
-        auto_status = "PAUSED"
-        try:
-            if sched_module.is_enabled():
-                auto_status = "ON"
-        except:
-            pass
-        print(f"  Auto: {auto_status}")
-        print(f"  Interval: 30sec")
-        
         # Next from proactive_schedule.json
         proactive = get_proactive_status()
         if proactive:
@@ -647,12 +629,10 @@ async def handle_command(cmd):
         print("\nCommands:")
         print("  trigger       - Trigger proactive conversation")
         print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
-        print("  pause      - Pause auto-scheduler + proactive")
-        print("  pause auto - Pause auto-scheduler only")
-        print("  pause proactive - Pause proactive schedule only")
+        print("  pause      - Pause proactive + appointment")
+        print("  pause proactive - Pause proactive schedule")
         print("  pause appointment - Pause appointment check")
-        print("  resume     - Resume auto-scheduler + proactive")
-        print("  resume auto - Resume auto-scheduler only")
+        print("  resume     - Resume proactive + appointment")
         print("  resume proactive - Resume proactive schedule")
         print("  resume appointment - Resume appointment check")
         print("  skip       - Skip current proactive contact")
@@ -689,12 +669,10 @@ async def async_main():
     print("\nCommands:")
     print("  trigger       - Trigger proactive conversation")
     print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
-    print("  pause      - Pause auto-scheduler + proactive")
-    print("  pause auto - Pause auto-scheduler only")
-    print("  pause proactive - Pause proactive schedule only")
+    print("  pause      - Pause proactive + appointment")
+    print("  pause proactive - Pause proactive schedule")
     print("  pause appointment - Pause appointment check")
-    print("  resume     - Resume auto-scheduler + proactive")
-    print("  resume auto - Resume auto-scheduler only")
+    print("  resume     - Resume proactive + appointment")
     print("  resume proactive - Resume proactive schedule")
     print("  resume appointment - Resume appointment check")
     print("  skip       - Skip current proactive contact")
