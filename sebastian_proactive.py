@@ -380,6 +380,21 @@ async def handle_command(cmd):
         print("\nSebastian: Talk soon!")
         raise asyncio.CancelledError()
     
+    # ===== MODEL COMMAND =====
+    if cmd.startswith("model "):
+        new_model = cmd.split(" ", 1)[1].strip().lower()
+        model_map = {
+            "phi4": "phi4",
+            "gemma4": "gemma4:26b",
+        }
+        if new_model in model_map:
+            os.environ["COMPANION_MODEL"] = model_map[new_model]
+            print(f"[Switched to model: {new_model}]")
+        else:
+            available = ", ".join(model_map.keys())
+            print(f"[Unknown model: {new_model}] Available: {available}")
+        return
+    
     # ===== PAUSE COMMANDS =====
     if cmd == "pause":
         os.environ["PROACTIVE_MODE"] = "false"
@@ -454,6 +469,7 @@ async def handle_command(cmd):
         
         # Show what was picked
         print(f"Combination: {combo}")
+        print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
         if intent:
             print(f" Intent: {intent[:60]}...")
         if cue_code:
@@ -504,6 +520,7 @@ async def handle_command(cmd):
         # Show what was picked
         print(f"Combination: {combo}")
         print(f" Mode: {mode}")
+        print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
         print(f" Intent: {intent[:60]}...")
         print(f" Cue: {cue_code}")
         
@@ -633,6 +650,7 @@ async def handle_command(cmd):
         print("  memory status - Show memory statistics")
         print("  memory on   - Include recent memory in prompts")
         print("  memory off  - Exclude recent memory from prompts")
+        print("  model X     - Switch model (phi4, gemma4)")
         print("  menu      - Show this commands menu")
         print("  clear     - Clear screen")
         print("  quit      - Exit")
@@ -667,12 +685,14 @@ async def async_main():
     print("  memory status - Show memory statistics")
     print("  memory on   - Include recent memory in prompts")
     print("  memory off  - Exclude recent memory from prompts")
+    print("  model X     - Switch model (phi4, gemma4)")
     print("  menu      - Show this commands menu")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
     print()
     print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}]")
     print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
+    print(f"[Model: {os.getenv('COMPANION_MODEL', 'phi4')}]")
     print(f"[Interval: {_global_interval}min]")
     print()
     

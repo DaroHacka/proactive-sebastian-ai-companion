@@ -76,6 +76,7 @@ Logs are saved to `logs/sebastian.log` automatically.
 | `resume auto` | Resume auto-scheduler only |
 | `resume proactive` | Resume proactive schedule only |
 | `resume appointment` | Resume appointment check only |
+| `model X` | Switch model (phi4, gemma4) |
 | `interval X` | Set check interval to X minutes |
 | `status` | Show status (proactive, appointment, auto, schedule) |
 | `clear-schedule` | Clear all appointments |
@@ -270,7 +271,7 @@ grep ERROR logs/sebastian.log
 ```env
 # Ollama
 OLLAMA_URL=http://localhost:11434              # Ollama server URL
-COMPANION_MODEL=phi4                           # Model to use
+COMPANION_MODEL=phi4                           # Model to use (phi4, gemma4:26b)
 
 # Scheduler
 SCHEDULER_INTERVAL_MINUTES=5                   # Check interval (minutes)
