@@ -46,7 +46,7 @@ MEMORY_DIR = "memory"
 PROMPT_LOG_DIR = "prompt-to-AI-logs"
 STATE_FILE = "state.json"
 LAST_INTERACTION_FILE = "last_interaction.json"
-APPOINTMENTS_FILE = "appointments.json"
+APPOINTMENTS_FILE = "appointments/appointments.json"
 MAX_MEMORY_ENTRIES = int(os.getenv("MAX_MEMORY_ENTRIES", "50"))
 ARCHIVE_THRESHOLD = int(os.getenv("ARCHIVE_THRESHOLD", "30"))
 _global_interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "10"))
@@ -55,6 +55,12 @@ _global_interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "10"))
 import scheduler as sched_module
 from time_parser import parse_response_for_time
 from cue_manager import get_random_cue
+
+try:
+    from config_manager import get_user_name
+except ImportError:
+    def get_user_name():
+        return "Elias"
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
@@ -76,7 +82,7 @@ COMBINATION_WEIGHTS = {
 SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short."""
 
 # Load prompt template from file
-PROMPT_TEMPLATE_FILE = "prompt_template.txt"
+PROMPT_TEMPLATE_FILE = "config/prompt_template.txt"
 _template_cache = {}
 
 def load_prompt_template():
@@ -95,6 +101,11 @@ def load_prompt_template():
                         _template_cache[key.strip()] = value.strip()
     except:
         pass
+    
+    # Apply dynamic user name substitution
+    user_name = get_user_name()
+    for key in _template_cache:
+        _template_cache[key] = _template_cache[key].replace("{USER_NAME}", user_name)
     
     return _template_cache
 

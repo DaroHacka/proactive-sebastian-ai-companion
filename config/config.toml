@@ -1,0 +1,37 @@
+[user]
+name = "Elias"
+email = "your_email@gmail.com"
+
+[paths]
+library = "library"
+appointments = "appointments"
+memory = "memory"
+config = "config"
+
+[ollama]
+url = "http://localhost:11434"
+model = "phi4"
+
+[system]
+proactive_mode = true
+appointment_mode = true
+memory_in_prompt = false
+test_mode = true
+
+[timing]
+scheduler_interval_minutes = 10
+proactive_check_seconds = 30
+appointment_check_seconds = 30
+
+[vibe]
+day_commentary_chance = 0.10
+weekend_longing_chance = 0.10
+
+[combo_weights]
+a_only = 0.20
+b_only = 0.10
+c_only = 0.15
+a_b = 0.15
+a_c = 0.20
+b_c = 0.10
+a_b_c = 0.10

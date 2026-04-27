@@ -19,10 +19,10 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-PROACTIVE_SCHEDULE_FILE = "proactive_schedule.json"
-SPECIAL_DATES_FILE = "special_dates.json"
-VIBE_LIBRARY_DAY = "vibe_library_01.txt"
-VIBE_LIBRARY_NIGHT = "vibe_library_02.txt"
+PROACTIVE_SCHEDULE_FILE = "appointments/proactive_schedule.json"
+SPECIAL_DATES_FILE = "appointments/special_dates.json"
+VIBE_LIBRARY_DAY = "library/vibe_library_01.txt"
+VIBE_LIBRARY_NIGHT = "library/vibe_library_02.txt"
 
 # Vibe library cache
 _vibe_library_day = None
@@ -114,8 +114,8 @@ def get_vibes_count(hour=None):
 
 # ==================== DAY-OF-WEEK VIBE SYSTEM ====================
 
-WEEK_DAYS_FILE = "week-days.txt"
-LONGING_FILE = "weekend_longing_interaction.txt"
+WEEK_DAYS_FILE = "library/week-days.txt"
+LONGING_FILE = "library/weekend_longing_interaction.txt"
 
 _week_days_cache = None
 _longing_cache = None

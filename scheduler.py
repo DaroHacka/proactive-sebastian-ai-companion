@@ -22,7 +22,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-APPOINTMENTS_FILE = "appointments.json"
+APPOINTMENTS_FILE = "appointments/appointments.json"
 
 # Test mode: rapid triggering (every 5 min) vs production (2-24 hours)
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"

@@ -6,7 +6,7 @@ Handles loading and selecting trigger cues for response variation.
 import random
 import os
 
-CUE_FILE = os.getenv("CUE_FILE", "cue_categories.txt")
+CUE_FILE = os.getenv("CUE_FILE", "library/cue_categories.txt")
 
 
 def load_cues() -> dict:

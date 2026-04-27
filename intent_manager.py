@@ -1,7 +1,7 @@
 import random
 import os
 
-INTENT_FILE = os.getenv("INTENT_FILE", "interaction_intents.txt")
+INTENT_FILE = os.getenv("INTENT_FILE", "library/interaction_intents.txt")
 
 WORRY_TEMPLATES = {
     0: "Hey, thinking of you. How's your day going?",
