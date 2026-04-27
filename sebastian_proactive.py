@@ -148,9 +148,9 @@ def build_combinatorial_prompt(context_str=None, hour=None):
     
     # Build task instructions based on combo
     prompts = {
-        "a_only": f"""Pick up this topic: "{intent}". Start a natural conversation. Context: {context_str}""",
-        "b_only": f"""You are playing as: "{cue_desc}". Start a conversation. Context: {context_str}""",
-        "c_only": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Context: {context_str}""",
+        "a_only": f"""Pick up this topic: "{intent}". Take inspiration from it, don't be literal, improvise. Start a natural conversation. Context: {context_str}""",
+        "b_only": f"""You are playing as: "{cue_desc}". Take inspiration from it, don't be literal, improvise. Start a conversation. Context: {context_str}""",
+        "c_only": f"""Take inspiration, don't be literal, improvise. In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Context: {context_str}""",
         "a_b": f"""Pick up this topic: "{intent}". Also playing as: "{cue_desc}". Context: {context_str}""",
         "a_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also: "{intent}". Context: {context_str}""",
         "b_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also playing as: "{cue_desc}". Context: {context_str}""",
