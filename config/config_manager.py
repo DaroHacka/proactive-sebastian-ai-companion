@@ -111,6 +111,16 @@ def is_test_mode() -> bool:
     return get_config().get("system", {}).get("test_mode", True)
 
 
+def is_proactive_on_startup() -> bool:
+    """Check if proactive should be ON on startup."""
+    return get_config().get("startup", {}).get("proactive_on_startup", True)
+
+
+def is_appointment_on_startup() -> bool:
+    """Check if appointment mode should be ON on startup."""
+    return get_config().get("startup", {}).get("appointment_on_startup", True)
+
+
 def get_timing(key: str) -> int:
     """Get a timing value in seconds."""
     return get_config().get("timing", {}).get(key, 30)

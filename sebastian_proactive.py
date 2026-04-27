@@ -19,10 +19,21 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from intent_manager import get_random_intent
 
-TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
-PROACTIVE_MODE = os.getenv("PROACTIVE_MODE", "false").lower() == "true"
-
+# Load .env FIRST to get defaults
 load_dotenv()
+
+# Try to load config.toml for startup defaults, fallback to .env values
+try:
+    from config.config_manager import is_proactive_on_startup, is_appointment_on_startup
+    PROACTIVE_DEFAULT = is_proactive_on_startup()
+    APPOINTMENT_DEFAULT = is_appointment_on_startup()
+except ImportError:
+    # Fallback to .env values if config not available
+    PROACTIVE_DEFAULT = True
+    APPOINTMENT_DEFAULT = True
+
+TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
+PROACTIVE_MODE = os.getenv("PROACTIVE_MODE", "true" if PROACTIVE_DEFAULT else "false").lower() == "true"
 
 # ==================== LOGGING ====================
 LOG_DIR = "logs"
@@ -409,37 +420,25 @@ async def handle_command(cmd):
         return
     
     # ===== PAUSE COMMANDS =====
-    if cmd == "pause":
-        os.environ["PROACTIVE_MODE"] = "false"
-        print("[Auto-scheduler paused]")
-        print("[Proactive schedule paused]")
-        return
-    
     if cmd == "pause proactive":
         os.environ["PROACTIVE_MODE"] = "false"
-        print("[Proactive schedule paused]")
+        print("[Proactive paused]")
         return
     
     if cmd == "pause appointment":
         os.environ["APPOINTMENT_MODE"] = "false"
-        print("[Appointment check paused]")
+        print("[Appointment paused]")
         return
     
     # ===== RESUME COMMANDS =====
-    if cmd == "resume":
-        os.environ["PROACTIVE_MODE"] = "true"
-        print("[Auto-scheduler resumed]")
-        print("[Proactive schedule resumed]")
-        return
-    
     if cmd == "resume proactive":
         os.environ["PROACTIVE_MODE"] = "true"
-        print("[Proactive schedule resumed]")
+        print("[Proactive resumed]")
         return
     
     if cmd == "resume appointment":
         os.environ["APPOINTMENT_MODE"] = "true"
-        print("[Appointment check resumed]")
+        print("[Appointment resumed]")
         return
     
     # ===== MEMORY COMMANDS =====
@@ -629,10 +628,8 @@ async def handle_command(cmd):
         print("\nCommands:")
         print("  trigger       - Trigger proactive conversation")
         print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
-        print("  pause      - Pause proactive + appointment")
         print("  pause proactive - Pause proactive schedule")
         print("  pause appointment - Pause appointment check")
-        print("  resume     - Resume proactive + appointment")
         print("  resume proactive - Resume proactive schedule")
         print("  resume appointment - Resume appointment check")
         print("  skip       - Skip current proactive contact")
@@ -669,10 +666,8 @@ async def async_main():
     print("\nCommands:")
     print("  trigger       - Trigger proactive conversation")
     print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
-    print("  pause      - Pause proactive + appointment")
     print("  pause proactive - Pause proactive schedule")
     print("  pause appointment - Pause appointment check")
-    print("  resume     - Resume proactive + appointment")
     print("  resume proactive - Resume proactive schedule")
     print("  resume appointment - Resume appointment check")
     print("  skip       - Skip current proactive contact")
