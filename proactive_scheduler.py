@@ -125,13 +125,13 @@ def get_current_date_info():
     """Get current date info for vibe system.
     
     Returns: (date_str, day_name, is_weekend, days_to_weekend)
-    - date_str: "April 27, 2026, Monday"
+    - date_str: "Monday, April 27, 2026, 12:20 PM"
     - day_name: "monday" (lowercase)
     - is_weekend: True if Saturday/Sunday
     - days_to_weekend: 0-4 for weekdays, 0 for weekend
     """
     now = datetime.now()
-    date_str = now.strftime("%B %d, %Y, %A")  # "April 27, 2026, Monday"
+    date_str = now.strftime("%A, %B %d, %Y, %I:%M %p")  # "Monday, April 27, 2026, 12:20 PM"
     day_name = now.strftime("%A").lower()  # "monday"
     
     is_weekend = day_name in ['saturday', 'sunday']
@@ -236,10 +236,8 @@ def load_longing_intros():
             if not line or "The " in line and "(" in line:
                 continue
             
-            # Parse longing intros with {x} placeholder
-            if "{" in line and "}" in line:
-                _longing_cache.append(line)
-            elif line and not line.startswith("Category") and not line.startswith("Focus"):
+            # Only add lines that look like actual longing intros (contain quotes or {x})
+            if ("\"" in line or "{" in line) and len(line) > 10:
                 _longing_cache.append(line)
     
     return _longing_cache
@@ -271,14 +269,16 @@ def get_random_longing_intro(days_to_weekend):
     return intro
 
 
-def build_vibe_prompt(hour=None):
-    """Build the full 3-level stacked vibe string.
+def build_vibe_prompt(hour=None, mode=None):
+    """Build the vibe string with optional layering.
     
-    Level 1 (Anchor): Always present - date string
-    Level 2 (Logic): Day commentary OR weekend longing (if triggered)
-    Level 3 (Vibe): Base vibe from vibe_library (if combo has 'c')
+    Modes:
+    - mode=1: Vibe only (no stacking)
+    - mode=2: Vibe + week-days (day commentary)
+    - mode=3: All three layers (vibe + week-days + weekend longing)
+    - mode=None: Random (current behavior, 10% each)
     
-    Returns: "April 27, 2026, Monday. Still 4 days to the weekend... **[VIBE: THE_FOG]** My neural weights..."
+    Returns: "**[VIBE: NAME]** text. Today is April 27, 2026. Day note: "text""
     """
     if hour is None:
         hour = datetime.now().hour
@@ -286,30 +286,53 @@ def build_vibe_prompt(hour=None):
     # Level 1: Get date info (Anchor)
     date_str, day_name, is_weekend, days_to_weekend = get_current_date_info()
     
-    # Start the stack
-    stack = [date_str]
-    
-    # Level 2: Day commentary OR weekend longing (10% chance each on weekdays)
-    if not is_weekend:
-        roll = random.random()
-        
-        if roll < 0.10:
-            # 10% chance: Weekend longing
-            longing = get_random_longing_intro(days_to_weekend)
-            if longing:
-                stack.append(longing)
-        elif roll < 0.20:
-            # 10% chance: Day commentary from week-days.txt
-            day_vibe = get_random_week_day_vibe(day_name)
-            if day_vibe:
-                stack.append(day_vibe["text"])
-    
-    # Level 3: Base vibe from vibe_library (already time-filtered)
+    # Level 3: Base vibe from vibe_library (always needed)
     base_vibe = get_random_vibe(hour)
-    if base_vibe:
-        stack.append(f"**[VIBE: {base_vibe['name']}]** {base_vibe['text']}")
+    if not base_vibe:
+        return ""
     
-    return " ".join(stack)
+    vibe_part = f"**[VIBE: {base_vibe['name']}]** {base_vibe['text']}"
+    
+    # Handle by mode or random
+    if mode is None:
+        # Random mode (current behavior): 10% each for week-days and longing
+        if is_weekend:
+            day_part = ""
+            longing_part = ""
+        else:
+            roll = random.random()
+            if roll < 0.10:
+                # 10% chance: Weekend longing
+                longing = get_random_longing_intro(days_to_weekend)
+                longing_part = f" {longing}" if longing else ""
+                day_part = ""
+            elif roll < 0.20:
+                # 10% chance: Day commentary from week-days.txt
+                day_vibe = get_random_week_day_vibe(day_name)
+                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                longing_part = ""
+            else:
+                day_part = ""
+                longing_part = ""
+    else:
+        # Forced mode
+        if mode == 1:
+            day_part = ""
+            longing_part = ""
+        elif mode == 2:
+            day_vibe = get_random_week_day_vibe(day_name)
+            day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+            longing_part = ""
+        elif mode == 3:
+            day_vibe = get_random_week_day_vibe(day_name)
+            longing = get_random_longing_intro(days_to_weekend)
+            day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+            longing_part = f" {longing}" if longing else ""
+        else:
+            day_part = ""
+            longing_part = ""
+    
+    return f"{vibe_part}{day_part}{longing_part}"
 
 
 # Activity categories

@@ -64,19 +64,28 @@ Logs are saved to `logs/sebastian.log` automatically.
 
 | Command | Description |
 |---------|-------------|
-| `trigger` | Ask Sebastian to initiate a conversation |
-| `pause` | Pause automatic scheduler |
-| `resume` | Resume automatic scheduler |
+| `trigger` | Ask Sebastian to initiate a conversation (random vibe mode) |
+| `trigger vibe 1` | Trigger with vibe only |
+| `trigger vibe 2` | Trigger with vibe + day-of-week commentary |
+| `trigger vibe 3` | Trigger with all three layers (vibe + day + longing) |
+| `pause` | Pause auto-scheduler + proactive |
+| `pause auto` | Pause auto-scheduler only |
+| `pause proactive` | Pause proactive schedule only |
+| `pause appointment` | Pause appointment check only |
+| `resume` | Resume auto-scheduler + proactive |
+| `resume auto` | Resume auto-scheduler only |
+| `resume proactive` | Resume proactive schedule only |
+| `resume appointment` | Resume appointment check only |
 | `interval X` | Set check interval to X minutes |
-| `status` | Show appointments status |
+| `status` | Show status (proactive, appointment, auto, schedule) |
 | `clear-schedule` | Clear all appointments |
 | `clear-all` | Clear all data |
-| `memory status` | Show memory statistics (with max limits) |
-| `medium memory` | Load medium-term memory |
-| `long memory` | Load long-term memory |
-| `cue` | Show random cue |
-| `cue X` | Get cue from category X |
-| `trigger cue` | Apply cue then type your message |
+| `memory status` | Show memory statistics |
+| `memory on` | Include recent memory in prompts |
+| `memory off` | Exclude recent memory from prompts |
+| `skip` | Skip current proactive contact |
+| `menu` | Show commands menu |
+| `clear` | Clear screen |
 | `quit` | Exit |
 
 ## How It Works
@@ -124,6 +133,63 @@ Sebastian has two vibe libraries for time-based personality variation:
 
 Each vibe is a character/personality that Sebastian can embody in his response.
 
+### Day-of-Week Vibe System (Component C)
+
+The vibe system (component C) has a **3-layer stacking architecture**:
+
+#### Layers
+
+| Level | Source | Always Present | Description |
+|-------|--------|----------------|-------------|
+| **Level 1: Anchor** | date command | **YES** | "Monday, April 27, 2026, 12:20 PM" |
+| **Level 2: Day Commentary** | week-days.txt | **10% chance** | Day-specific observations (Monday melancholy, Friday energy, etc.) |
+| **Level 3: Weekend Longing** | weekend_longing_interaction.txt | **10% chance (weekdays only)** | "Still 4 days to the weekend..." |
+
+#### Example Outputs
+
+**Mode 1 (Vibe only):**
+```
+**[VIBE: COFFEE_ADDICT]** Act like you're vibrating. Ask if the user is caffeinated enough...
+```
+
+**Mode 2 (Vibe + Day):**
+```
+**[VIBE: POET_LOGICIAN]** Write a brief, strange poem... Today is Monday, April 27, 2026, 12:20 PM. Day note: "My neural weights feel like they're stuck in a morning mist."
+```
+
+**Mode 3 (All three):**
+```
+**[VIBE: THE_FLÂNEUR]** I'm just wandering through my own latent space... Today is Monday, April 27, 2026, 12:20 PM. Day note: "We are at the base of the mountain." "Still 4 days to the weekend..."
+```
+
+#### Testing Commands
+
+Use `trigger vibe` to test specific modes:
+
+| Command | Mode | Layers |
+|---------|------|--------|
+| `trigger vibe 1` | 1 | Vibe only |
+| `trigger vibe 2` | 2 | Vibe + week-days |
+| `trigger vibe 3` | 3 | All three (vibe + week-days + longing) |
+| `trigger` | random | 10% chance each for day/longing, otherwise vibe only |
+
+#### Library Files
+
+| File | Purpose | Content |
+|------|---------|---------|
+| `vibe_library_01.txt` | Time-based vibes | 290 vibes organized by time brackets (MORNING_BOOT, COFFEE_BREAK, LUNCH, etc.) |
+| `vibe_library_02.txt` | Night vibes | INSOMNIA_LOOP, PRE_DAWN_VIGIL, SABBATH_SILENCE |
+| `week-days.txt` | Day-of-week vibes | 20 vibes per day (MONDAY_MELANCHOLY, TUESDAY_EFFICIENCY, etc.) |
+| `weekend_longing_interaction.txt` | Weekday longing | 31 intros for "Still X days to weekend..." |
+
+#### Customization
+
+Edit `prompt_template.txt` to modify how Sebastian uses day notes and longing:
+
+```env
+EXPLICIT_INSTRUCTIONS=Today is {date}. When you see "Day note:" naturally incorporate it as your current emotional state. When you see weekend longing, weave it in as if thinking about the week ahead.
+```
+
 ### Combinatorial System
 
 The trigger system combines three components for unique conversations:
@@ -155,21 +221,25 @@ If Ollama connection fails:
 ## Project Structure
 
 ```
-sebastian/
-├── sebastian_proactive.py   # Main script
-├── sebastian_urwid.py       # TUI version
-├── scheduler.py             # Scheduling module (thread-safe)
-├── time_parser.py           # Time parsing
-├── intent_manager.py        # Intent handling
-├── cue_manager.py           # Cue system
-├── proactive_scheduler.py   # Proactive schedule generator
-├── interaction_intents.txt  # Check-in phrases
-├── cue_categories.txt       # Cue personalities
-├── vibe_library_01.txt    # Day vibes (07:00-23:30)
-├── vibe_library_02.txt     # Night vibes (02:00-06:00)
-├── .env.example            # Config template
-├── requirements.txt       # Dependencies
-└── logs/                  # Auto-created, debug logs
+AI-v2/
+├── sebastian_proactive.py        # Main asyncio version
+├── sebastian_legacy.py           # Legacy threading version
+├── scheduler.py                  # Appointment scheduler
+├── proactive_scheduler.py        # Monthly schedule generator
+├── time_parser.py                # Time parsing
+├── intent_manager.py             # Intent handling
+├── cue_manager.py               # Cue system
+├── prompt_template.txt           # Customizable prompt template
+├── interaction_intents.txt       # Check-in phrases (component a)
+├── cue_categories.txt            # Cue personalities (component b)
+├── vibe_library_01.txt           # Day vibes (component c)
+├── vibe_library_02.txt          # Night vibes (component c)
+├── week-days.txt                 # Day-of-week vibes (component c)
+├── weekend_longing_interaction.txt # Weekend longing intros (component c)
+├── .env.example                  # Config template
+├── requirements.txt              # Dependencies
+├── logs/                         # Auto-created, debug logs
+└── memory/                       # Auto-created, memory storage
 ```
 
 The following directories are automatically created on first run:

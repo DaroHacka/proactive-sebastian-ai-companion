@@ -64,6 +64,7 @@ from proactive_scheduler import (
     load_vibe_library,
     get_random_vibe,
     build_vibe_prompt,
+    get_current_date_info,
 )
 
 # ==================== COMBINATORIAL SYSTEM ====================
@@ -125,7 +126,7 @@ def load_conversations():
     return []
 
 
-def build_combinatorial_prompt(context_str=None, hour=None, combo=None):
+def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=None):
     if hour is None:
         hour = datetime.now().hour
     if context_str is None:
@@ -136,6 +137,9 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None):
     # Load template
     template = load_prompt_template()
     
+    # Get date for explicit instructions
+    date_str, _, _, _ = get_current_date_info()
+    
     # Get identity and style from template (with fallbacks)
     identity = template.get("SYSTEM_IDENTITY", "You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short.")
     proactive = template.get("PROACTIVE_INSTRUCTION", "")
@@ -143,12 +147,13 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None):
     anti = template.get("ANTI_PATTERNS", "Do NOT say things like 'that's a great question'")
     length = template.get("LENGTH", "Keep it short and natural (1-2 sentences)")
     context_instr = template.get("RECENT_CONTEXT_INSTRUCTION", "Consider recent context from memory: {recent_context}")
+    explicit = template.get("EXPLICIT_INSTRUCTIONS", "")
     
     intent = get_random_intent() if "a" in combo else None
     cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
     
-    # Use new 3-layer vibe system
-    vibe_text = build_vibe_prompt(hour) if "c" in combo else None
+    # Use new 3-layer vibe system with mode
+    vibe_text = build_vibe_prompt(hour, mode) if "c" in combo else None
     
     # Build task instructions based on combo
     prompts = {
@@ -182,6 +187,8 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None):
         prompt_parts.append(anti)
     if length:
         prompt_parts.append(length)
+    if explicit:
+        prompt_parts.append(explicit.format(date=date_str))
     if context_instr and recent_context:
         prompt_parts.append(context_instr.format(recent_context=recent_context))
     elif recent_context:
@@ -469,6 +476,55 @@ async def handle_command(cmd):
         print(f"\nSebastian: {response}")
         return
     
+    # ===== TRIGGER VIBE (testing modes) =====
+    if cmd.startswith("trigger vibe "):
+        try:
+            mode = int(cmd.split()[2])
+            if mode not in [1, 2, 3]:
+                print("[Usage: trigger vibe 1/2/3]")
+                print("  1 = vibe only")
+                print("  2 = vibe + week-days")
+                print("  3 = all three (vibe + week-days + longing)")
+                return
+        except (IndexError, ValueError):
+            print("[Usage: trigger vibe 1/2/3]")
+            print("  1 = vibe only")
+            print("  2 = vibe + week-days")
+            print("  3 = all three (vibe + week-days + longing)")
+            return
+        
+        print(f"\n[Triggering vibe mode {mode}...]")
+        hour = datetime.now().hour
+        
+        # Use a_b_c combo with specified mode
+        combo = "a_b_c"
+        intent = get_random_intent()
+        cue_code, cue_desc, _ = get_random_cue()
+        
+        # Show what was picked
+        print(f"Combination: {combo}")
+        print(f" Mode: {mode}")
+        print(f" Intent: {intent[:60]}...")
+        print(f" Cue: {cue_code}")
+        
+        # Build and show vibe
+        vibe_text = build_vibe_prompt(hour, mode)
+        print(f" Vibe: {vibe_text[:100]}...")
+        
+        # Build context and prompt
+        context = "Activity: manual trigger"
+        if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+            recent = load_conversations()
+            if recent:
+                context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
+        
+        prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo, mode=mode)
+        save_prompt_to_log(prompt, f"trigger_vibe_{mode}")
+        
+        response = await send_to_ollama(prompt)
+        print(f"\nSebastian: {response}")
+        return
+    
     # ===== SKIP =====
     if cmd == "skip":
         contact = get_next_proactive_contact()
@@ -559,7 +615,8 @@ async def handle_command(cmd):
     # ===== MENU =====
     if cmd == "menu":
         print("\nCommands:")
-        print("  trigger    - Trigger proactive conversation")
+        print("  trigger       - Trigger proactive conversation")
+        print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
         print("  pause      - Pause auto-scheduler + proactive")
         print("  pause auto - Pause auto-scheduler only")
         print("  pause proactive - Pause proactive schedule only")
@@ -592,7 +649,8 @@ async def async_main():
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
     print("=" * 50)
     print("\nCommands:")
-    print("  trigger    - Trigger proactive conversation")
+    print("  trigger       - Trigger proactive conversation")
+    print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
     print("  pause      - Pause auto-scheduler + proactive")
     print("  pause auto - Pause auto-scheduler only")
     print("  pause proactive - Pause proactive schedule only")
