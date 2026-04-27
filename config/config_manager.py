@@ -12,6 +12,7 @@ DEFAULT_CONFIG = {
     "paths": {"library": "library", "appointments": "appointments", "memory": "memory", "config": "config"},
     "ollama": {"url": "http://localhost:11434", "model": "phi4", "available_models": ["phi4", "gemma4:26b"]},
     "system": {"proactive_mode": True, "appointment_mode": True, "memory_in_prompt": False, "test_mode": True},
+    "user_input": {"combo_trigger_chance": 0.20},
     "timing": {"scheduler_interval_minutes": 10, "proactive_check_seconds": 30, "appointment_check_seconds": 30},
     "vibe": {"day_commentary_chance": 0.10, "weekend_longing_chance": 0.10},
     "combo_weights": {"a_only": 0.20, "b_only": 0.10, "c_only": 0.15, "a_b": 0.15, "a_c": 0.20, "b_c": 0.10, "a_b_c": 0.10},
@@ -83,6 +84,11 @@ def get_model() -> str:
 def get_available_models() -> list:
     """Get available models list."""
     return get_config().get("ollama", {}).get("available_models", ["phi4"])
+
+
+def get_combo_trigger_chance() -> float:
+    """Get combo trigger chance for user input."""
+    return get_config().get("user_input", {}).get("combo_trigger_chance", 0.20)
 
 
 def is_proactive_mode() -> bool:

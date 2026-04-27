@@ -57,10 +57,12 @@ from time_parser import parse_response_for_time
 from cue_manager import get_random_cue
 
 try:
-    from config_manager import get_user_name
+    from config_manager import get_user_name, get_combo_trigger_chance
 except ImportError:
     def get_user_name():
         return "Elias"
+    def get_combo_trigger_chance():
+        return 0.20
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
@@ -667,8 +669,15 @@ async def handle_command(cmd):
         print("  quit      - Exit")
         return
     
-    # Unknown command: send to AI as free text
-    response = await send_to_ollama(cmd)
+    # Combo trigger chance on normal user message
+    if random.random() < get_combo_trigger_chance():
+        combo = select_combination()
+        print(f"\n[Combo triggered: {combo}]")
+        prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
+        response = await send_to_ollama(prompt)
+    else:
+        # Unknown command: send to AI as free text
+        response = await send_to_ollama(cmd)
     print(f"\nSebastian: {response}")
 
 

@@ -11,12 +11,16 @@ config = "config"
 [ollama]
 url = "http://localhost:11434"
 model = "phi4"
+available_models = ["phi4", "gemma4:26b"]
 
 [system]
 proactive_mode = true
 appointment_mode = true
 memory_in_prompt = false
 test_mode = true
+
+[user_input]
+combo_trigger_chance = 0.20
 
 [timing]
 scheduler_interval_minutes = 10
