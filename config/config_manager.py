@@ -10,7 +10,7 @@ from pathlib import Path
 DEFAULT_CONFIG = {
     "user": {"name": "Elias", "email": "your_email@gmail.com"},
     "paths": {"library": "library", "appointments": "appointments", "memory": "memory", "config": "config"},
-    "ollama": {"url": "http://localhost:11434", "model": "phi4"},
+    "ollama": {"url": "http://localhost:11434", "model": "phi4", "available_models": ["phi4", "gemma4:26b"]},
     "system": {"proactive_mode": True, "appointment_mode": True, "memory_in_prompt": False, "test_mode": True},
     "timing": {"scheduler_interval_minutes": 10, "proactive_check_seconds": 30, "appointment_check_seconds": 30},
     "vibe": {"day_commentary_chance": 0.10, "weekend_longing_chance": 0.10},
@@ -70,11 +70,6 @@ def get_user_email() -> str:
     return get_config().get("user", {}).get("email", "")
 
 
-def get_path(key: str) -> str:
-    """Get a path from config."""
-    return get_config().get("paths", {}).get(key, key)
-
-
 def get_ollama_url() -> str:
     """Get Ollama URL."""
     return get_config().get("ollama", {}).get("url", "http://localhost:11434")
@@ -83,6 +78,11 @@ def get_ollama_url() -> str:
 def get_model() -> str:
     """Get default model."""
     return get_config().get("ollama", {}).get("model", "phi4")
+
+
+def get_available_models() -> list:
+    """Get available models list."""
+    return get_config().get("ollama", {}).get("available_models", ["phi4"])
 
 
 def is_proactive_mode() -> bool:
