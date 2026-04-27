@@ -63,6 +63,7 @@ from proactive_scheduler import (
     get_proactive_status,
     load_vibe_library,
     get_random_vibe,
+    build_vibe_prompt,
 )
 
 # ==================== COMBINATORIAL SYSTEM ====================
@@ -124,11 +125,13 @@ def load_conversations():
     return []
 
 
-def build_combinatorial_prompt(context_str=None, hour=None):
+def build_combinatorial_prompt(context_str=None, hour=None, combo=None):
     if hour is None:
         hour = datetime.now().hour
     if context_str is None:
         context_str = "Activity: general chat"
+    if combo is None:
+        combo = select_combination()
     
     # Load template
     template = load_prompt_template()
@@ -141,20 +144,21 @@ def build_combinatorial_prompt(context_str=None, hour=None):
     length = template.get("LENGTH", "Keep it short and natural (1-2 sentences)")
     context_instr = template.get("RECENT_CONTEXT_INSTRUCTION", "Consider recent context from memory: {recent_context}")
     
-    combo = select_combination()
-    intent = get_random_intent()
-    cue_code, cue_desc, _ = get_random_cue()
-    vibe = get_random_vibe(hour)
+    intent = get_random_intent() if "a" in combo else None
+    cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+    
+    # Use new 3-layer vibe system
+    vibe_text = build_vibe_prompt(hour) if "c" in combo else None
     
     # Build task instructions based on combo
     prompts = {
         "a_only": f"""Pick up this topic: "{intent}". Take inspiration from it, don't be literal, improvise. Start a natural conversation. Context: {context_str}""",
         "b_only": f"""You are playing as: "{cue_desc}". Take inspiration from it, don't be literal, improvise. Start a conversation. Context: {context_str}""",
-        "c_only": f"""Take inspiration, don't be literal, improvise. In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Context: {context_str}""",
+        "c_only": f"""Take inspiration, don't be literal, improvise. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Context: {context_str}""",
         "a_b": f"""Pick up this topic: "{intent}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also: "{intent}". Context: {context_str}""",
-        "b_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe['text']}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_b_c": f"""Topic: "{intent}", vibe: "{vibe['text']}", cue: "{cue_desc}". Context: {context_str}""",
+        "a_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Also: "{intent}". Context: {context_str}""",
+        "b_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Also playing as: "{cue_desc}". Context: {context_str}""",
+        "a_b_c": f"""Topic: "{intent}", vibe: "{vibe_text}", cue: "{cue_desc}". Context: {context_str}""",
     }
     task_instructions = prompts.get(combo, prompts["a_only"])
     
@@ -451,14 +455,14 @@ async def handle_command(cmd):
             library = "day" if hour >= 6 else "night"
             print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
         
-        # Build context and prompt
+        # Build context and prompt - pass combo to ensure same combo used
         context = "Activity: manual trigger"
         if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
             recent = load_conversations()
             if recent:
                 context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
         
-        prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+        prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo)
         save_prompt_to_log(prompt, "trigger")
         
         response = await send_to_ollama(prompt)

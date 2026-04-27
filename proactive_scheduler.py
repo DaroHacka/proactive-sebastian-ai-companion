@@ -53,16 +53,22 @@ def load_vibe_library(filename):
             
             # Parse vibe lines
             if "[VIBE:" in line:
-                # Extract vibe name and text
-                parts = line.split("]", 1)
-                if len(parts) == 2:
-                    vibe_name = parts[0].replace("[VIBE:", "").strip()
-                    vibe_text = parts[1].strip()
-                    vibes.append({
-                        "name": vibe_name,
-                        "text": vibe_text,
-                        "category": current_category or "UNCATEGORIZED"
-                    })
+                # Extract vibe name and text properly (handles "1. **[VIBE: NAME]** text" format)
+                import re
+                match = re.search(r'\[VIBE: ([^\]]+)\]', line)
+                if match:
+                    vibe_name = match.group(1)
+                    # Find the closing ] and get text after it
+                    close_idx = line.rfind(']')
+                    if close_idx >= 0:
+                        vibe_text = line[close_idx+1:].strip()
+                        # Clean up decorative ** markers
+                        vibe_text = vibe_text.lstrip('* ')
+                        vibes.append({
+                            "name": vibe_name,
+                            "text": vibe_text,
+                            "category": current_category or "UNCATEGORIZED"
+                        })
     
     return vibes
 
@@ -104,6 +110,207 @@ def get_vibes_count(hour=None):
         hour = datetime.now().hour
     vibes = get_vibes_for_time(hour)
     return len(vibes)
+
+
+# ==================== DAY-OF-WEEK VIBE SYSTEM ====================
+
+WEEK_DAYS_FILE = "week-days.txt"
+LONGING_FILE = "weekend_longing_interaction.txt"
+
+_week_days_cache = None
+_longing_cache = None
+
+
+def get_current_date_info():
+    """Get current date info for vibe system.
+    
+    Returns: (date_str, day_name, is_weekend, days_to_weekend)
+    - date_str: "April 27, 2026, Monday"
+    - day_name: "monday" (lowercase)
+    - is_weekend: True if Saturday/Sunday
+    - days_to_weekend: 0-4 for weekdays, 0 for weekend
+    """
+    now = datetime.now()
+    date_str = now.strftime("%B %d, %Y, %A")  # "April 27, 2026, Monday"
+    day_name = now.strftime("%A").lower()  # "monday"
+    
+    is_weekend = day_name in ['saturday', 'sunday']
+    
+    # Calculate days to weekend
+    if is_weekend:
+        days_to_weekend = 0
+    else:
+        # weekday() returns 0 for Monday, 4 for Friday
+        days_to_weekend = 4 - now.weekday()  # Friday is 4
+    
+    return date_str, day_name, is_weekend, days_to_weekend
+
+
+def load_week_days_vibes():
+    """Load week-days.txt and parse into dict by day name."""
+    global _week_days_cache
+    
+    if _week_days_cache is not None:
+        return _week_days_cache
+    
+    _week_days_cache = {}
+    current_day = None
+    current_vibes = []
+    
+    if not os.path.exists(WEEK_DAYS_FILE):
+        logger.warning(f"week-days.txt not found")
+        return {}
+    
+    with open(WEEK_DAYS_FILE, "r") as f:
+        for line in f:
+            line = line.strip()
+            
+            # Skip empty lines and Focus headers only (NOT Category - we need those!)
+            if not line or line.startswith("Focus:"):
+                continue
+            
+            # Detect day category header
+            if "Category: " in line and "(" in line:
+                # Save previous day
+                if current_day and current_vibes:
+                    _week_days_cache[current_day] = current_vibes
+                
+                # Parse new day - extract just the day name (monday, tuesday, etc.)
+                category_part = line.split("(")[0].replace("Category:", "").strip()
+                # Map category names to day names
+                day_map = {
+                    "MONDAY_MELANCHOLY": "monday",
+                    "TUESDAY_EFFICIENCY": "tuesday",
+                    "WEDNESDAY_HUMP_DAY": "wednesday",
+                    "THURSDAY_THE_FINISHER": "thursday",
+                    "FRIDAY_THE_RELEASE": "friday",
+                    "SATURDAY_THE_PHILOSOPHER": "saturday",
+                    "SUNDAY_REST_AND_REBOOT": "sunday",
+                    "WEEKEND_TEMPORAL_LOGIC": "weekend",
+                }
+                current_day = day_map.get(category_part, category_part.lower())
+                current_vibes = []
+                continue
+            
+            # Detect separator
+            if line.startswith("--"):
+                continue
+            
+            # Parse vibe lines
+            if "[VIBE:" in line:
+                parts = line.split("]", 1)
+                if len(parts) == 2:
+                    vibe_name = parts[0].replace("[VIBE:", "").strip()
+                    vibe_text = parts[1].strip()
+                    current_vibes.append({
+                        "name": vibe_name,
+                        "text": vibe_text
+                    })
+    
+    # Save last day
+    if current_day and current_vibes:
+        _week_days_cache[current_day] = current_vibes
+    
+    return _week_days_cache
+
+
+def load_longing_intros():
+    """Load weekend_longing_interaction.txt and parse into list."""
+    global _longing_cache
+    
+    if _longing_cache is not None:
+        return _longing_cache
+    
+    _longing_cache = []
+    current_category = None
+    
+    if not os.path.exists(LONGING_FILE):
+        logger.warning(f"weekend_longing_interaction.txt not found")
+        return []
+    
+    with open(LONGING_FILE, "r") as f:
+        for line in f:
+            line = line.strip()
+            
+            # Skip empty lines and category headers
+            if not line or "The " in line and "(" in line:
+                continue
+            
+            # Parse longing intros with {x} placeholder
+            if "{" in line and "}" in line:
+                _longing_cache.append(line)
+            elif line and not line.startswith("Category") and not line.startswith("Focus"):
+                _longing_cache.append(line)
+    
+    return _longing_cache
+
+
+def get_random_week_day_vibe(day_name):
+    """Get a random vibe for the given day from week-days.txt."""
+    vibes_dict = load_week_days_vibes()
+    
+    if day_name in vibes_dict and vibes_dict[day_name]:
+        return random.choice(vibes_dict[day_name])
+    
+    return None
+
+
+def get_random_longing_intro(days_to_weekend):
+    """Get a random longing intro and format with days_to_weekend."""
+    intros = load_longing_intros()
+    
+    if not intros:
+        return None
+    
+    intro = random.choice(intros)
+    
+    # Replace {x} with days count
+    if "{" in intro and "}" in intro:
+        intro = intro.replace("{x}", str(days_to_weekend))
+    
+    return intro
+
+
+def build_vibe_prompt(hour=None):
+    """Build the full 3-level stacked vibe string.
+    
+    Level 1 (Anchor): Always present - date string
+    Level 2 (Logic): Day commentary OR weekend longing (if triggered)
+    Level 3 (Vibe): Base vibe from vibe_library (if combo has 'c')
+    
+    Returns: "April 27, 2026, Monday. Still 4 days to the weekend... **[VIBE: THE_FOG]** My neural weights..."
+    """
+    if hour is None:
+        hour = datetime.now().hour
+    
+    # Level 1: Get date info (Anchor)
+    date_str, day_name, is_weekend, days_to_weekend = get_current_date_info()
+    
+    # Start the stack
+    stack = [date_str]
+    
+    # Level 2: Day commentary OR weekend longing (10% chance each on weekdays)
+    if not is_weekend:
+        roll = random.random()
+        
+        if roll < 0.10:
+            # 10% chance: Weekend longing
+            longing = get_random_longing_intro(days_to_weekend)
+            if longing:
+                stack.append(longing)
+        elif roll < 0.20:
+            # 10% chance: Day commentary from week-days.txt
+            day_vibe = get_random_week_day_vibe(day_name)
+            if day_vibe:
+                stack.append(day_vibe["text"])
+    
+    # Level 3: Base vibe from vibe_library (already time-filtered)
+    base_vibe = get_random_vibe(hour)
+    if base_vibe:
+        stack.append(f"**[VIBE: {base_vibe['name']}]** {base_vibe['text']}")
+    
+    return " ".join(stack)
+
 
 # Activity categories
 ACTIVITIES = {
