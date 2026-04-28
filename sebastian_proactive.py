@@ -704,6 +704,7 @@ async def async_main():
     print("  resume proactive - Resume proactive schedule")
     print("  resume appointment - Resume appointment check")
     print("  skip       - Skip current proactive contact")
+    print("  kill       - Kill ollama and restart")
     print("  interval X - Set check interval to X minutes")
     print("  status     - Show status")
     print("  clear-schedule - Clear scheduled appointments")
