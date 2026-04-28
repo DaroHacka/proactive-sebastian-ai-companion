@@ -17,8 +17,11 @@ prompt-to-AI-logs/
 sebastian.log
 
 # Implementation notes & workflow plans
-todo/
 implementation/
+todo/
+
+# Data folder (additional data)
+data/
 
 # Proactive schedule (generated locally)
 proactive_schedule.json
