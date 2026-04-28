@@ -68,12 +68,14 @@ from time_parser import parse_response_for_time
 from cue_manager import get_random_cue
 
 try:
-    from config_manager import get_user_name, get_combo_trigger_chance
+    from config_manager import get_user_name, get_combo_trigger_chance, get_ai_timeout
 except ImportError:
     def get_user_name():
         return "Elias"
     def get_combo_trigger_chance():
         return 0.20
+    def get_ai_timeout():
+        return 600
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
@@ -236,7 +238,7 @@ async def send_to_ollama(prompt):
                 payload["context"] = _session_context
         
         def _call():
-            response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=500)
+            response = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=get_ai_timeout())
             response.raise_for_status()
             return response.json()
         
@@ -403,6 +405,17 @@ async def handle_command(cmd):
     if cmd in ["quit", "exit", "q"]:
         print("\nSebastian: Talk soon!")
         raise asyncio.CancelledError()
+    
+    # ===== KILL COMMAND =====
+    if cmd == "kill":
+        print("[Killing ollama process...]")
+        import subprocess
+        subprocess.run(["pkill", "-9", "-f", "ollama"], check=False)
+        print("[Waiting 2 minutes for ollama to restart...]")
+        await asyncio.sleep(120)
+        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("[Ollama restarted]")
+        return
     
     # ===== MODEL COMMAND =====
     if cmd.startswith("model "):
@@ -633,6 +646,7 @@ async def handle_command(cmd):
         print("  resume proactive - Resume proactive schedule")
         print("  resume appointment - Resume appointment check")
         print("  skip       - Skip current proactive contact")
+        print("  kill       - Kill ollama and restart")
         print("  interval X - Set check interval to X minutes")
         print("  status     - Show status")
         print("  clear-schedule - Clear scheduled appointments")

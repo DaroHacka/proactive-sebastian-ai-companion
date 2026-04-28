@@ -111,6 +111,11 @@ def is_test_mode() -> bool:
     return get_config().get("system", {}).get("test_mode", True)
 
 
+def get_ai_timeout() -> int:
+    """Get AI timeout in seconds."""
+    return get_config().get("system", {}).get("ai_timeout_seconds", 600)
+
+
 def is_proactive_on_startup() -> bool:
     """Check if proactive should be ON on startup."""
     return get_config().get("startup", {}).get("proactive_on_startup", True)

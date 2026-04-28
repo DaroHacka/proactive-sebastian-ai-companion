@@ -18,6 +18,7 @@ proactive_mode = true
 appointment_mode = true
 memory_in_prompt = false
 test_mode = true
+ai_timeout_seconds = 600  # 10 minutes
 
 [startup]
 proactive_on_startup = true
