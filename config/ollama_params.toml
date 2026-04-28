@@ -1,82 +1,50 @@
-# =============================================================================
-# OLLAMA PARAMETERS CONFIGURATION FILE
-# =============================================================================
-# 
-# GROUPS (in order of priority):
-# 1. [common]      - Parameters you'll likely adjust most often
-# 2. [streaming]  - Response streaming settings
-# 3. [model]       - Model loading/loading parameters  
-# 4. [advanced]   - Less common, expert-only parameters
-#
-# To apply changes:
-# 1. Edit this file
-# 2. Save file
-# 3. Restart sebastian_proactive.py
-#
-# To restore defaults: Type "restore AI parameters" command (will restart automatically)
-#
-# IMPORTANT: These parameters are per-request only - they don't modify the model.
-# They control how the model generates text for each request.
-# =============================================================================
-
-# =============================================================================
-# [1] COMMON PARAMETERS (Most frequently used)
-# =============================================================================
 [temperature]
-value = 2.0
+value = "0.8"
 description = "Controls output randomness. 0.0 = deterministic, 2.0 = very random. Example: 0.7 = balanced, 0.2 = focused, 1.5 = creative"
 group = "common"
 
 [top_p]
-value = 0.9
+value = "0.9"
 description = "Nucleus sampling threshold. Example: 0.9 = consider tokens in top 90% probability, 0.95 = more options"
 group = "common"
 
 [top_k]
-value = 20
+value = "20"
 description = "Limit next token to top K most likely. Example: 20 = only top 20 tokens considered, 40 = broader selection"
 group = "common"
 
 [max_tokens]
-value = 500
+value = "500"
 description = "Maximum tokens to generate. Example: 100 = short response, 500 = medium, -1 = unlimited"
 group = "common"
 
 [repeat_penalty]
-value = 1.2
+value = "1.2"
 description = "Penalize repeated tokens. Example: 1.0 = no penalty, 1.2 = reduces repetition, 1.5 = very strict"
 group = "common"
 
 [seed]
-value = -1
+value = "-1"
 description = "Random seed for reproducibility. -1 = random. Example: seed=42 gives same output every time with same prompt"
 group = "common"
 
-
-# =============================================================================
-# [2] STREAMING PARAMETERS
-# =============================================================================
 [stream]
-value = false
+value = "false"
 description = "Stream response. false = wait for complete response, true = stream chunks as generated"
 group = "streaming"
 
-
-# =============================================================================
-# [3] MODEL LOADING PARAMETERS  
-# =============================================================================
 [num_ctx]
-value = 1024
+value = "1024"
 description = "Context window size (number of tokens). Example: 1024 = shorter context, 4096 = longer context"
 group = "model"
 
 [num_gpu]
-value = 0
+value = "0"
 description = "GPU layers to load. 0 = auto, 1+ = specific number"
 group = "model"
 
 [num_thread]
-value = 0
+value = "0"
 description = "CPU threads to use. 0 = auto-detect"
 group = "model"
 
@@ -85,72 +53,68 @@ value = "5m"
 description = "How long to keep model loaded in memory. Example: 5m = 5 minutes, 1h = 1 hour, -1 = forever"
 group = "model"
 
-
-# =============================================================================
-# [4] ADVANCED PARAMETERS (Expert only)
-# =============================================================================
 [min_p]
-value = 0.0
+value = "0.0"
 description = "Minimum token probability threshold. 0.0 = disabled, 0.05 = only tokens with 5%+ probability"
 group = "advanced"
 
 [frequency_penalty]
-value = 0.0
+value = "0.0"
 description = "Penalize frequently used tokens (0.0-2.0)"
 group = "advanced"
 
 [presence_penalty]
-value = 0.0
+value = "0.0"
 description = "Penalize repeated context (0.0-2.0)"
 group = "advanced"
 
 [repeat_last_n]
-value = 64
+value = "64"
 description = "Look back N tokens when applying repeat penalty"
 group = "advanced"
 
 [tfs_z]
-value = 1.0
+value = "1.0"
 description = "Tail free sampling parameter"
 group = "advanced"
 
 [typical_p]
-value = 0.7
+value = "0.7"
 description = "Typical sampling threshold"
 group = "advanced"
 
 [mirostat]
-value = 0
+value = "0"
 description = "Mirostat algorithm: 0 = disabled, 1 = v1, 2 = v2"
 group = "advanced"
 
 [mirostat_tau]
-value = 0.8
+value = "0.8"
 description = "Mirostat tau (entropy) parameter"
 group = "advanced"
 
 [mirostat_eta]
-value = 0.6
+value = "0.6"
 description = "Mirostat eta (learning rate) parameter"
 group = "advanced"
 
 [use_mmap]
-value = true
+value = "true"
 description = "Use memory mapping for model loading"
 group = "advanced"
 
 [use_mlock]
-value = false
+value = "false"
 description = "Lock model in memory"
 group = "advanced"
 
 [num_keep]
-value = 5
+value = "5"
 description = "Number of tokens to keep in prompt"
 group = "advanced"
 
 [num_batch]
-value = 2
+value = "2"
 description = "Batch size for prompt processing"
 group = "advanced"
 
@@ -160,7 +124,6 @@ description = "Stop sequences. Example: ['\\n\\n', 'User:'] stops on double newl
 group = "advanced"
 
 [logit_bias]
-value = {}
 description = "Custom token probability modifications. Example: {12345: -5.0} makes token ID 12345 very unlikely"
 group = "advanced"
 
@@ -170,7 +133,7 @@ description = "Reasoning effort (phi4 only): low, medium, high"
 group = "advanced"
 
 [think]
-value = false
+value = "false"
 description = "Enable thinking mode for reasoning models (phi4 only)"
 group = "advanced"
 
@@ -179,10 +142,6 @@ value = ""
 description = "Output format: empty (default), json, yaml"
 group = "advanced"
 
-
-# =============================================================================
-# PER-MODEL DEFAULTS (Optional - loaded if model matches)
-# =============================================================================
 [model_phi4]
 model_name = "phi4"
 temperature = 0.7
@@ -200,3 +159,5 @@ model_name = "llama"
 temperature = 0.8
 top_p = 0.95
 description = "Default parameters when using llama models"
+
+[logit_bias.value]

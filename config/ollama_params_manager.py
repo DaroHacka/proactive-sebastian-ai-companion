@@ -195,33 +195,60 @@ def restore_defaults() -> bool:
     global _params
     _params = DEFAULT_PARAMS.copy()
     
-    # Save defaults to file
     path = Path(_params_path)
     if path.exists():
         try:
             with open(_params_path, "r") as f:
-                content = f.read()
+                lines = f.readlines()
             
-            # Replace values with defaults
+            param_defaults = {}
             for key, value in DEFAULT_PARAMS.items():
-                if key in ["stop", "logit_bias", "format"]:
-                    default_val = "[]" if key == "stop" else "{}" if key == "logit_bias" else '""'
+                if key in ["stop"]:
+                    param_defaults[key] = "[]"
+                elif key in ["logit_bias"]:
+                    param_defaults[key] = "{}"
+                elif key in ["format"]:
+                    param_defaults[key] = '""'
+                elif key in ["keep_alive"]:
+                    param_defaults[key] = f'"{value}"'
                 elif isinstance(value, bool):
-                    default_val = "true" if value else "false"
+                    param_defaults[key] = "true" if value else "false"
                 elif isinstance(value, int):
-                    default_val = str(value)
+                    param_defaults[key] = str(value)
                 elif isinstance(value, float):
-                    default_val = str(value)
+                    param_defaults[key] = str(value)
                 else:
-                    default_val = str(value)
+                    param_defaults[key] = str(value)
+            
+            new_lines = []
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                stripped = line.strip()
                 
-                # Simple replace - find value = X and replace
-                import re
-                pattern = rf'({key}\s*value\s*=)\s*.*'
-                content = re.sub(pattern, f'{key} = {default_val}', content)
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    param_name = stripped[1:-1]
+                    if param_name in param_defaults:
+                        new_lines.append(line)
+                        i += 1
+                        if i < len(lines):
+                            next_line = lines[i].strip()
+                            # Only replace value if it exists
+                            if next_line.startswith("value ="):
+                                i += 1
+                                default_val = param_defaults[param_name]
+                                if default_val not in ["[]", "{}"] and not default_val.startswith('"'):
+                                    default_val = f'"{default_val}"'
+                                new_lines.append(f"value = {default_val}\n")
+                            else:
+                                pass  # No value line found, skip this param
+                        continue
+                
+                new_lines.append(line)
+                i += 1
             
             with open(_params_path, "w") as f:
-                f.write(content)
+                f.writelines(new_lines)
             
             return True
         except Exception as e:
