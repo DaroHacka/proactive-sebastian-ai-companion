@@ -67,6 +67,17 @@ import scheduler as sched_module
 from time_parser import parse_response_for_time
 from cue_manager import get_random_cue
 
+# Add config path
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'config'))
+
+try:
+    from ollama_params_manager import restore_defaults, load_ollama_params
+except:
+    def restore_defaults(): return False
+    def load_ollama_params(): return {}
+
+
 try:
     from config_manager import (
         get_user_name, 
@@ -427,6 +438,21 @@ async def handle_command(cmd):
         print("[Ollama restarted]")
         return
     
+    
+    # ===== RESET PARAMETERS =====
+    if cmd == "reset parameters":
+        print("[Restoring AI parameters to defaults...]")
+        try:
+            restore_defaults()
+            print("[Parameters restored to defaults]")
+            print("[Restarting with default parameters...]")
+            raise asyncio.CancelledError()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            print(f"[Could not restore parameters: {e}]")
+        return
+
     # ===== MODEL COMMAND =====
     if cmd.startswith("model "):
         new_model = cmd.split(" ", 1)[1].strip().lower()
@@ -668,6 +694,7 @@ async def handle_command(cmd):
         print("  menu      - Show this commands menu")
         print("  clear     - Clear screen")
         print("  quit      - Exit")
+        print("  reset parameters - Reset to defaults and quit")
         return
     
     # Combo trigger chance on normal user message
@@ -716,6 +743,7 @@ async def async_main():
     print("  menu      - Show this commands menu")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
+    print("  reset parameters - Reset to defaults and quit")
     print()
     print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}]")
     print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
