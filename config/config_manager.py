@@ -141,6 +141,86 @@ def get_combo_weight(combo: str) -> float:
     return get_config().get("combo_weights", {}).get(combo, 0.10)
 
 
+def validate_schedule_percentages(config: dict = None) -> tuple:
+    """Validate and normalize schedule percentages.
+    
+    Returns (active_percentage, sparse_percentage, was_normalized, warning_message)
+    """
+    if config is None:
+        config = get_config()
+    
+    schedule = config.get("schedule", {})
+    active = schedule.get("active_day_percentage", 0.30)
+    
+    # Check if user provided sparse percentage
+    user_sparse = schedule.get("sparse_day_percentage")
+    
+    normalized = False
+    warning = None
+    
+    if user_sparse is not None:
+        total = active + user_sparse
+        if abs(total - 1.0) > 0.001:
+            # Normalize
+            normalized_sparse = 1.0 - active
+            normalized = True
+            warning = (
+                f"Schedule percentages (active={active:.2f}, sparse={user_sparse:.2f}) "
+                f"don't sum to 100%. Normalized: sparse = {normalized_sparse:.2f}"
+            )
+            return active, normalized_sparse, normalized, warning
+        else:
+            return active, user_sparse, False, None
+    
+    # No user_sparse provided, calculate implied
+    sparse = 1.0 - active
+    return active, sparse, False, None
+
+
+def get_schedule_config(key: str = None, default: any = None) -> any:
+    """Get schedule configuration."""
+    cfg = get_config().get("schedule", {
+        "contacts_sparse_min": 2,
+        "contacts_sparse_max": 4,
+        "contacts_active_min": 5,
+        "contacts_active_max": 15,
+        "active_day_percentage": 0.30
+    })
+    
+    if key:
+        return cfg.get(key, default)
+    return cfg
+
+
+def validate_combo_weights(config: dict = None) -> tuple:
+    """Validate combo weights sum to 1.0.
+    
+    Returns (weights_dict, was_normalized, warning_message)
+    """
+    if config is None:
+        config = get_config()
+    
+    weights = config.get("combo_weights", {})
+    
+    # Calculate sum
+    total = sum(weights.values())
+    
+    normalized = False
+    warning = None
+    
+    if abs(total - 1.0) > 0.001:
+        # Normalize weights
+        factor = 1.0 / total if total > 0 else 1.0
+        weights = {k: v * factor for k, v in weights.items()}
+        normalized = True
+        warning = (
+            f"Combo weights don't sum to 100% (got {total:.2f}). "
+            f"Normalized to sum to 1.0"
+        )
+    
+    return weights, normalized, warning
+
+
 def save_config(config_path: str = None):
     """Save current config to file."""
     global _config

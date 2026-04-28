@@ -68,7 +68,13 @@ from time_parser import parse_response_for_time
 from cue_manager import get_random_cue
 
 try:
-    from config_manager import get_user_name, get_combo_trigger_chance, get_ai_timeout
+    from config_manager import (
+        get_user_name, 
+        get_combo_trigger_chance, 
+        get_ai_timeout,
+        validate_schedule_percentages,
+        validate_combo_weights,
+    )
 except ImportError:
     def get_user_name():
         return "Elias"
@@ -76,6 +82,10 @@ except ImportError:
         return 0.20
     def get_ai_timeout():
         return 600
+    def validate_schedule_percentages(*args):
+        return 0.30, 0.70, False, None
+    def validate_combo_weights(*args):
+        return {}, False, None
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
@@ -674,6 +684,15 @@ async def handle_command(cmd):
 
 async def async_main():
     """Main async loop - Sebastian's heartbeat."""
+    # Validate config percentages
+    _, sparse, norm_sched, warn_sched = validate_schedule_percentages()
+    if warn_sched:
+        logger.warning(f"CONFIG: {warn_sched}")
+    
+    _, norm_combo, warn_combo = validate_combo_weights()
+    if warn_combo:
+        logger.warning(f"CONFIG: {warn_combo}")
+    
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
     print("=" * 50)
