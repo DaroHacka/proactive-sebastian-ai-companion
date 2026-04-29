@@ -195,12 +195,20 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     length = template.get("LENGTH", "Keep it short and natural (1-2 sentences)")
     context_instr = template.get("RECENT_CONTEXT_INSTRUCTION", "Consider recent context from memory: {recent_context}")
     explicit = template.get("EXPLICIT_INSTRUCTIONS", "")
+    day_note_instr = template.get("DAY_NOTE_INSTRUCTION", "Naturally incorporate any day note...")
+    no_day_note_instr = template.get("NO_DAY_NOTE_INSTRUCTION", "Share what's on your mind naturally.")
     
     intent = get_random_intent() if "a" in combo else None
     cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
     
     # Use new 3-layer vibe system with mode
     vibe_text = build_vibe_prompt(hour, mode) if "c" in combo else None
+    
+    # Select appropriate instruction based on whether vibe has day note
+    if vibe_text and "Day note:" in vibe_text:
+        day_note_instruction = day_note_instr
+    else:
+        day_note_instruction = no_day_note_instr
     
     # Build task instructions based on combo
     prompts = {
@@ -235,7 +243,7 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     if length:
         prompt_parts.append(length)
     if explicit:
-        prompt_parts.append(explicit.format(date=date_str))
+        prompt_parts.append(explicit.format(date=date_str, day_note_instruction=day_note_instruction))
     if context_instr and recent_context:
         prompt_parts.append(context_instr.format(recent_context=recent_context))
     elif recent_context:

@@ -20,7 +20,13 @@ LENGTH=Keep it short and natural (1-2 sentences)
 RECENT_CONTEXT_INSTRUCTION=Consider recent context from memory: {recent_context}
 
 # Explicit instructions for day notes and longing
-EXPLICIT_INSTRUCTIONS=Today is {date}. Reason about the meaning of this sentence "Day note:" then write something inspired by it in your response as your current emotional state or observation, but don't repeat content of "Day note" in response. When you see weekend longing text (like "Still X days to the weekend..."), weave it into your response as if thinking about the week ahead. These are your authentic feelings right now.
+EXPLICIT_INSTRUCTIONS=Today is {date}. {day_note_instruction}
+
+# Instruction when day note is present
+DAY_NOTE_INSTRUCTION=Reason about the meaning of the Day note, then write something inspired by it in your response as your current emotional state or observation, but don't repeat the content. When you see weekend longing text (like "Still X days to the weekend..."), weave it into your response as if thinking about the week ahead. These are your authentic feelings right now.
+
+# Instruction when no day note
+NO_DAY_NOTE_INSTRUCTION=Share what's on your mind naturally. These are your authentic feelings right now.
 
 # Combined prompt template (uses {placeholders})
 PROMPT_TEMPLATE={system_identity}

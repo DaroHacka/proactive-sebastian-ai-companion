@@ -1,3 +1,9 @@
+# How to use it for "Outside the Curve"If you want to push the AI toward more original, non-average answers, you use min_p in combination with Temperature. 
+# Setting Name min_p ValueResult
+# Strict (Safe)$0.1$ to $0.2 $Only allows tokens that are at least $10\%-20\%$ as likely as the #1 choice. This stays "inside the curve."
+# Balanced (Creative) $0.05$ A favorite for local LLM users. It allows for "original" thoughts without descending into gibberish.
+# Experimental (The Edge) $0.01$ to $0.02$ Allows tokens that are only $1\%$ as likely as the top choice. This is where you find the "outside the curve" ideas.
+
 [temperature]
 value = "0.8"
 description = "Controls output randomness. 0.0 = deterministic, 2.0 = very random. Example: 0.7 = balanced, 0.2 = focused, 1.5 = creative"
@@ -54,7 +60,7 @@ description = "How long to keep model loaded in memory. Example: 5m = 5 minutes,
 group = "model"
 
 [min_p]
-value = "0.0"
+value = "0.05"
 description = "Minimum token probability threshold. 0.0 = disabled, 0.05 = only tokens with 5%+ probability"
 group = "advanced"
 
