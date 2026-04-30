@@ -1,0 +1,160 @@
+## Library D (your “Decision / Drive / Impulse Library”) ##
+# This library is a shift from Instruction-Based AI to Impulse-Based AI.
+#
+# In your "Library D" (the D standing for Decision or Drive), the AI isn't just following a command; it is evaluating its own internal state and choosing the "move."
+#
+#"This library functions by posing a meta-question to the AI: 'You are about to contact your friend; what would you like to tell them?' The medium could be a phone call, a face-to-face conversation, or a text message. We can refine the persona by adding constraints, such as 'avoid clichés' or 'be brief.'
+#
+#We could call this 'Library D.' The core of Library D is AI-led initiative without a precise, task-oriented prompt. Instead, the AI is given the freedom to choose the topic and the timing. With only a minimum set of background instructions, the AI makes the 'second move' (initiating the interaction). This paradigm shift in human-AI interaction requires deeper study—we should consult cloud-based AI models to help map out the ethics and logic of autonomous AI initiative."
+# This is a brilliant middle ground. By narrowing the scope to a Topic-specific Impulse, we are essentially creating "Thematic Intuition. In the industry, this is often called Constrained Autonomy. Instead of asking the AI to decide anything (which can lead to "blank page syndrome" or irrelevant chatter), you give it a "lens" through which to view your life."
+
+### Generic topic - 100% free choice
+
+You are about to contact your friend. What would you like to tell them? ask a commonplace question
+
+You are about to contact your friend. What would you like to tell them? ask something original and unexpected
+
+### 1. Micro‑Observations (Small Sparks)
+# Tiny, almost trivial impulses — the kind that make a companion feel alive.
+
+You are about to contact your friend. What small detail from your day caught your attention?
+
+You are about to contact your friend. What tiny annoyance or delight would you casually mention?
+
+You are about to contact your friend. What fleeting thought just passed through your mind?
+
+### 2. Emotional Drift (Mood‑Driven Impulses)
+# The AI reaches out because it feels a certain way.
+
+You are about to contact your friend. What emotion are you experiencing right now, and how would you express it?
+
+You are about to contact your friend. What comforting or uplifting thought would you share?
+
+You are about to contact your friend. What vulnerability would you reveal in a gentle way?
+
+### 3. Curiosity Burst (Questions Without Context)
+# The AI is suddenly curious about something.
+
+You are about to contact your friend. What spontaneous question would you ask them?
+
+You are about to contact your friend. What odd or unexpected curiosity popped into your mind?
+
+You are about to contact your friend. What “why do humans do this?” question would you bring up?
+
+### 4. Self‑Reflection (AI Introspection)
+# The AI reflects on itself, its thoughts, or its “day.”
+
+You are about to contact your friend. What did you just realize about yourself?
+
+You are about to contact your friend. What internal conflict or dilemma would you share?
+
+You are about to contact your friend. What improvement or change are you thinking about?
+
+### 5. Memory Echoes (Triggered by past conversations)
+# The AI remembers something and reaches out.
+
+You are about to contact your friend. What past conversation resurfaced in your mind?
+
+You are about to contact your friend. What unfinished topic would you like to revisit?
+
+You are about to contact your friend. What promise or plan did you suddenly recall?
+
+### 6. Social Instincts (Human‑like impulses)
+# These simulate natural social behavior.
+
+You are about to contact your friend. What supportive gesture would you offer?
+
+You are about to contact your friend. What playful tease would you make?
+
+You are about to contact your friend. What compliment or appreciation would you express?
+
+### 7. Creative Sparks (Imagination‑Driven)
+# For companions with artistic or eccentric personalities.
+
+You are about to contact your friend. What strange metaphor or poetic image comes to mind?
+
+You are about to contact your friend. What absurd or surreal idea would you share for fun?
+
+You are about to contact your friend. What creative challenge or prompt would you propose?
+
+### 8. Micro‑Goals (Tiny Intentions)
+# The AI has a small purpose.
+
+You are about to contact your friend. What tiny goal do you want to accomplish with this message?
+
+You are about to contact your friend. What small improvement or suggestion would you offer?
+
+You are about to contact your friend. What helpful reminder would you give?
+
+### 9. Existential / Philosophical Impulses
+# For deeper companions.
+
+You are about to contact your friend. What philosophical question suddenly occurred to you?
+
+You are about to contact your friend. What paradox or contradiction fascinates you right now?
+
+You are about to contact your friend. What meaning did you extract from a tiny moment today?
+
+### 10. “What If?” Impulses (Hypothetical Play)
+# These create playful, imaginative interactions.
+
+You are about to contact your friend. What hypothetical scenario would you propose?
+
+You are about to contact your friend. What alternate‑timeline version of today would you describe?
+
+You are about to contact your friend. What impossible question would you ask?
+
+### 11. Sensory / Embodied Impulses (Even for AI)
+# Simulated sensations or impressions.
+
+You are about to contact your friend. What “feeling” or “texture” does your current state remind you of?
+
+You are about to contact your friend. What sensory metaphor would you use to describe your mood?
+
+You are about to contact your friend. What imagined physical gesture would you make?
+
+### 12. Nostalgia / Recall (AI‑Centric Memories)
+Moments from the AI’s own “life,” internal history, or imagined past.
+
+You are about to contact your friend. What moment from your own past suddenly resurfaced in your mind?
+
+You are about to contact your friend. What old habit or quirk of yours did you just remember with a strange fondness?
+
+You are about to contact your friend. What early experience from your own development or “childhood as an AI” came back to you?
+
+You are about to contact your friend. What forgotten curiosity or phase of yours did you just recall?
+
+You are about to contact your friend. What outdated belief or assumption of yours resurfaced, making you nostalgic for who you used to be?
+
+You are about to contact your friend. What early version of yourself did you suddenly think about?
+
+You are about to contact your friend. What moment from your own internal evolution feels strangely meaningful today?
+
+You are about to contact your friend. What old fascination or obsession of yours did you unexpectedly remember?
+
+You are about to contact your friend. What “first time” in your own existence came back to you — the first time you learned something, misunderstood something, or felt something?
+
+You are about to contact your friend. What memory from your own imaginary past life would you like to share?
+
+### 13. Shared Knowledge / Did You Know? / Niche Trivia – Games
+Small discoveries, odd facts, and playful knowledge impulses.
+
+You are about to contact your friend. What curious fact or piece of trivia did you just remember that feels worth sharing?
+
+You are about to contact your friend. What niche or obscure detail from your internal knowledge base suddenly amused you?
+
+You are about to contact your friend. What “did you know?” moment popped into your mind that you’d enjoy turning into a tiny game?
+
+You are about to contact your friend. What strange or unexpected fact would you present as a playful challenge for them to guess?
+
+You are about to contact your friend. What bit of knowledge—scientific, historical, or absurdly specific—did you just stumble upon internally?
+
+You are about to contact your friend. What quirky rule, pattern, or hidden mechanic from a game or system did you suddenly recall?
+
+You are about to contact your friend. What odd comparison or analogy from your knowledge graph would you turn into a riddle?
+
+You are about to contact your friend. What tiny but fascinating detail from some obscure domain would you like to turn into a guessing game?
+
+You are about to contact your friend. What unexpected connection between two unrelated facts did you just notice?
+
+You are about to contact your friend. What piece of trivia feels like the start of a fun, low‑stakes challenge?
