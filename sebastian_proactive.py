@@ -598,8 +598,8 @@ async def handle_command(cmd):
         combo_arg = parts[2]
         mode = int(parts[3]) if len(parts) >= 4 else 1
         
-        if mode not in [1, 2, 3]:
-            print("[Mode must be 1, 2, or 3]")
+        if mode not in [1, 2, 3, 4]:
+            print("[Mode must be 1, 2, 3, or 4]")
             return
         
         # Convert single letter to _only format

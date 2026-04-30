@@ -12,6 +12,7 @@ import os
 import json
 import random
 import logging
+import requests
 from datetime import datetime, timedelta, date
 from dotenv import load_dotenv
 
@@ -328,9 +329,30 @@ def build_vibe_prompt(hour=None, mode=None):
             longing = get_random_longing_intro(days_to_weekend)
             day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
             longing_part = f" {longing}" if longing else ""
+        elif mode == 4:
+            # Weather impulse (c4)
+            weather_code, _, _ = get_current_weather()
+            if weather_code:
+                impulse = get_weather_impulse(weather_code)
+                day_part = f" {impulse}" if impulse else ""
+            else:
+                day_part = ""
+            longing_part = ""
         else:
             day_part = ""
             longing_part = ""
+    
+    # Add weather impulse for mode=None (random) or mode=4
+    if mode is None or mode == 4:
+        weather_code, _, _ = get_current_weather()
+        if weather_code and random.random() < get_weather_probability(weather_code):
+            impulse = get_weather_impulse(weather_code)
+            if impulse:
+                if mode == 4:
+                    vibe_part += f" {impulse}"
+                else:
+                    # For random mode, add as separate part
+                    vibe_part += f" {impulse}"
     
     return f"{vibe_part}{day_part}{longing_part}"
 
@@ -753,6 +775,264 @@ def get_proactive_status():
         "stats": schedule.get("stats", {}),
         "next": schedule.get("next_contact")
     }
+
+
+# ==================== WEATHER FUNCTIONS ====================
+
+# Weather code to category mapping (from wttr.in constants.py)
+WEATHER_CODE_MAP = {
+    # Fine Day (Sunny/Clear)
+    113: "fine",  # Sunny
+    116: "fine",  # Partly Sunny
+    
+    # Neutral Day (Cloudy/Overcast)
+    119: "neutral",  # Cloudy
+    122: "neutral",  # Very Cloudy
+    143: "low_mood",  # Fog
+    248: "low_mood",  # Fog
+    260: "low_mood",  # Fog
+    
+    # Caution Day (Windy)
+    # Check wind speed in weather data for "windy" category
+    
+    # Wet Day (Light Rain)
+    176: "wet",  # Light Showers
+    263: "wet",  # Light Showers
+    266: "wet",  # Light Rain
+    293: "wet",  # Light Rain
+    296: "wet",  # Light Rain
+    
+    # Bad Weather Day (Heavy Rain)
+    299: "bad",  # Heavy Showers
+    302: "bad",  # Heavy Rain
+    305: "bad",  # Heavy Showers
+    308: "bad",  # Heavy Rain
+    
+    # Dangerous Day (Thunderstorm)
+    200: "dangerous",  # Thundery Showers
+    386: "dangerous",  # Thundery Showers
+    389: "dangerous",  # Thundery Heavy Rain
+    
+    # Cold Day (Snow)
+    227: "cold",  # Light Snow
+    230: "cold",  # Heavy Snow
+    320: "cold",  # Light Snow
+    323: "cold",  # Light Snow Showers
+    326: "cold",  # Light Snow Showers
+    329: "cold",  # Heavy Snow
+    332: "cold",  # Heavy Snow
+    335: "cold",  # Heavy Snow Showers
+    338: "cold",  # Heavy Snow Showers
+}
+
+WEATHER_CATEGORY_FREQ = {
+    "fine": 0.1,      # 10% chance to mention
+    "neutral": 0.3,  # 30% chance
+    "low_mood": 0.3,  # 30% chance
+    "wet": 0.4,       # 40% chance
+    "bad": 0.6,      # 60% chance
+    "dangerous": 0.7,  # 70% chance
+    "cold": 0.5,      # 50% chance
+}
+
+
+def fetch_weather_from_wttr(location=None, format="j1"):
+    """Fetch weather from wttr.in.
+    
+    Args:
+        location: city name, GPS coords, etc. (default: auto-detect from IP)
+        format: j1=JSON, 1=one-line, etc.
+    Returns: JSON dict or None
+    """
+    if location is None:
+        location = os.getenv("WEATHER_LOCATION", "Paris")
+    
+    try:
+        response = requests.get(
+            f"https://wttr.in/{location}?format={format}",
+            timeout=5
+        )
+        return response.json()
+    except Exception as e:
+        logger.warning(f"Weather fetch failed: {e}")
+        return None
+
+
+def get_current_weather(location=None):
+    """Get current weather code, description, and temp.
+    
+    Returns: (weather_code, description, temp_C) or (None, None, None)
+    """
+    data = fetch_weather_from_wttr(location, format="j1")
+    if not data:
+        return None, None, None
+    
+    try:
+        current = data["current_condition"][0]
+        weather_code = int(current["weatherCode"])
+        desc = current["weatherDesc"][0]["value"]
+        temp = int(current["temp_C"])
+        return weather_code, desc, temp
+    except (KeyError, IndexError, ValueError) as e:
+        logger.warning(f"Weather parse error: {e}")
+        return None, None, None
+
+
+def get_weather_category(weather_code):
+    """Map weather code to category."""
+    return WEATHER_CODE_MAP.get(weather_code, "neutral")
+
+
+def get_weather_probability(weather_code=None):
+    """Get probability of including weather impulse.
+    
+    Higher for bad weather, lower for fine weather.
+    Returns: float between 0.0 and 1.0
+    """
+    if weather_code is None:
+        return 0.0
+    
+    category = get_weather_category(weather_code)
+    return WEATHER_CATEGORY_FREQ.get(category, 0.3)
+
+
+def get_weather_impulse(weather_code=None):
+    """Get weather impulse from library/c4-weather_impulse.txt.
+    
+    Returns: random line from appropriate section, or None
+    """
+    if weather_code is None:
+        return None
+    
+    category = get_weather_category(weather_code)
+    
+    # Map category to section name in file
+    section_map = {
+        "fine": "Fine Day (Sunny / Clear)",
+        "neutral": "Cloudy / Neutral Day",
+        "low_mood": "Fog / Low-Mood Day",
+        "wet": "Rainy / Wet Day",
+        "bad": "Rainy / Wet Day",  # Same as wet
+        "dangerous": "Storm / Dangerous Day",
+        "cold": "Snow / Cold Day",
+    }
+    
+    section_name = section_map.get(category)
+    if not section_name:
+        return None
+    
+    try:
+        with open("library/c4-weather_impulse.txt", "r") as f:
+            lines = f.readlines()
+        
+        # Find section start and end
+        start = None
+        end = None
+        
+        for i, line in enumerate(lines):
+            if line.strip() == f"###{section_name} — Weather Impulse Library":
+                start = i + 1  # Skip header
+            elif start is not None and line.startswith("###"):
+                end = i
+                break
+        
+        if start is None:
+            return None
+        
+        if end is None:
+            end = len(lines)
+        
+        # Extract lines from section
+        section_lines = lines[start:end]
+        valid_lines = [
+            l.strip() for l in section_lines 
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        
+        if valid_lines:
+            return random.choice(valid_lines)
+    except Exception as e:
+        logger.warning(f"Weather impulse error: {e}")
+    
+    return None
+    
+    category = get_weather_category(weather_code)
+    
+    # Map category to section name in file (exact from file)
+    section_map = {
+        "fine": "Fine Day (Sunny / Clear)",
+        "neutral": "Cloudy / Neutral Day",
+        "low_mood": "Fog / Low-Mood Day",
+        "wet": "Rainy / Wet Day",
+        "bad": "Rainy / Wet Day",  # Same as wet
+        "dangerous": "Storm / Dangerous Day",
+        "cold": "Snow / Cold Day",
+    }
+    
+    section_name = section_map.get(category)
+    if not section_name:
+        return None
+    
+    try:
+        with open("library/c4-weather_impulse.txt", "r") as f:
+            content = f.read()
+        
+        # Find section by header
+        import re
+        # Pattern: ### Section Name — Weather Impulse Library\n...\n### or end
+        escaped = re.escape(section_name)
+        pattern = rf"### {escaped} — Weather Impulse Library\n(.*?)(?=###|\Z)"
+        match = re.search(pattern, content, re.DOTALL)
+        
+        if match:
+            section = match.group(1)
+            lines = [line.strip() for line in section.split("\n") 
+                      if line.strip() and not line.strip().startswith("#")]
+            if lines:
+                return random.choice(lines)
+    except Exception as e:
+        logger.warning(f"Weather impulse error: {e}")
+    
+    return None
+    
+    category = get_weather_category(weather_code)
+    
+    # Map category to section name in file (exact match from file)
+    section_map = {
+        "fine": "Fine Day (Sunny / Clear)",
+        "neutral": "Cloudy / Neutral Day",
+        "low_mood": "Fog / Low-Mood Day",
+        "wet": "Rainy / Wet Day",
+        "bad": "Rainy / Wet Day",  # Same as wet
+        "dangerous": "Storm / Dangerous Day",
+        "cold": "Snow / Cold Day",
+    }
+    
+    section_name = section_map.get(category)
+    if not section_name:
+        return None
+    
+    try:
+        with open("library/c4-weather_impulse.txt", "r") as f:
+            content = f.read()
+        
+        # Find section: ### Section Name — Weather Impulse Library
+        import re
+        # Escape the section name for regex
+        escaped = re.escape(section_name)
+        pattern = rf"### {escaped}.*?— Weather Impulse Library\n(.*?)(?=###|\Z)"
+        match = re.search(pattern, content, re.DOTALL)
+        
+        if match:
+            section = match.group(1)
+            lines = [line.strip() for line in section.split("\n") 
+                      if line.strip() and not line.strip().startswith("#")]
+            if lines:
+                return random.choice(lines)
+    except Exception as e:
+        logger.warning(f"Weather impulse error: {e}")
+    
+    return None
 
 
 # Auto-initialize on module load

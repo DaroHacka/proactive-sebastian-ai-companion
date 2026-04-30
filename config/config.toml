@@ -36,6 +36,9 @@ appointment_check_seconds = 30
 day_commentary_chance = 0.10
 weekend_longing_chance = 0.10
 
+[weather]
+location = "Paris"  # User's location for wttr.in
+
 [combo_weights]
 a_only = 0.20
 b_only = 0.10
