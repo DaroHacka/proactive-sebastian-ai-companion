@@ -274,12 +274,13 @@ def build_vibe_prompt(hour=None, mode=None):
     """Build the vibe string with optional layering.
     
     Modes:
-    - mode=1: Vibe only (no stacking)
-    - mode=2: Vibe + week-days (day commentary)
-    - mode=3: All three layers (vibe + week-days + weekend longing)
-    - mode=None: Random (current behavior, 10% each)
+    - mode=1: Vibe only (c1, no stacking)
+    - mode=2: Vibe + week-days (c1+c2)
+    - mode=3: All three layers (c1+c2+c3)
+    - mode=4: Vibe + weather impulse (c1+c4) with 33%/33%/33% context distribution
+    - mode=None: Random 33%/33%/34% for mode1/mode2/mode3
     
-    Returns: "**[VIBE: NAME]** text. Today is April 27, 2026. Day note: "text""
+    Returns: "**[VIBE: NAME]** text. Today is April 27, 2026. Day note: "text" [longing] [weather]"
     """
     if hour is None:
         hour = datetime.now().hour
@@ -287,72 +288,92 @@ def build_vibe_prompt(hour=None, mode=None):
     # Level 1: Get date info (Anchor)
     date_str, day_name, is_weekend, days_to_weekend = get_current_date_info()
     
-    # Level 3: Base vibe from vibe_library (always needed)
+    # Level 3: Base vibe from vibe_library (always needed, c1)
     base_vibe = get_random_vibe(hour)
     if not base_vibe:
         return ""
     
     vibe_part = f"**[VIBE: {base_vibe['name']}]** {base_vibe['text']}"
+    day_part = ""
+    longing_part = ""
     
-    # Handle by mode or random
     if mode is None:
-        # Random mode (current behavior): 10% each for week-days and longing
+        # Random mode: 33%/33%/34% distribution
         if is_weekend:
             day_part = ""
             longing_part = ""
         else:
             roll = random.random()
-            if roll < 0.10:
-                # 10% chance: Weekend longing
-                longing = get_random_longing_intro(days_to_weekend)
-                longing_part = f" {longing}" if longing else ""
+            if roll < 0.33:
+                # 33%: c1 only (mode1)
                 day_part = ""
-            elif roll < 0.20:
-                # 10% chance: Day commentary from week-days.txt
+                longing_part = ""
+            elif roll < 0.66:
+                # 33%: c1+c2 (mode2)
                 day_vibe = get_random_week_day_vibe(day_name)
                 day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
                 longing_part = ""
             else:
+                # 34%: c1+c2+c3 (mode3)
+                day_vibe = get_random_week_day_vibe(day_name)
+                longing = get_random_longing_intro(days_to_weekend)
+                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                longing_part = f" {longing}" if longing else ""
+    elif mode == 1:
+        # c1 only
+        day_part = ""
+        longing_part = ""
+    elif mode == 2:
+        # c1+c2
+        day_vibe = get_random_week_day_vibe(day_name)
+        day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+        longing_part = ""
+    elif mode == 3:
+        # c1+c2+c3
+        day_vibe = get_random_week_day_vibe(day_name)
+        longing = get_random_longing_intro(days_to_weekend)
+        day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+        longing_part = f" {longing}" if longing else ""
+    elif mode == 4:
+        # c1+c4 (weather) with 33%/33%/33% context distribution
+        weather_code, _, _ = get_current_weather()
+        if weather_code:
+            roll = random.random()
+            context_parts = []
+            
+            if roll < 0.33:
+                # 33%: Weather only (no context)
+                context_str = None
                 day_part = ""
-                longing_part = ""
-    else:
-        # Forced mode
-        if mode == 1:
-            day_part = ""
-            longing_part = ""
-        elif mode == 2:
-            day_vibe = get_random_week_day_vibe(day_name)
-            day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
-            longing_part = ""
-        elif mode == 3:
-            day_vibe = get_random_week_day_vibe(day_name)
-            longing = get_random_longing_intro(days_to_weekend)
-            day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
-            longing_part = f" {longing}" if longing else ""
-        elif mode == 4:
-            # Weather impulse (c4)
-            weather_code, _, _ = get_current_weather()
-            if weather_code:
-                impulse = get_weather_impulse(weather_code)
-                day_part = f" {impulse}" if impulse else ""
+            elif roll < 0.66:
+                # 33%: Weather + c2 (day note)
+                day_vibe = get_random_week_day_vibe(day_name)
+                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                if day_part:
+                    context_parts.append(f"Day: {day_part}")
+                context_str = ". ".join(context_parts) if context_parts else None
             else:
-                day_part = ""
+                # 34%: Weather + c1 + c2 (full context)
+                context_parts.append(f"Vibe: {base_vibe['text']}")
+                day_vibe = get_random_week_day_vibe(day_name)
+                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                if day_part:
+                    context_parts.append(f"Day: {day_part}")
+                context_str = ". ".join(context_parts) if context_parts else None
+            
+            impulse = get_weather_impulse(weather_code, context_str)
+            if impulse:
+                vibe_part += f" {impulse}"
+            
             longing_part = ""
         else:
+            # No weather data, fallback to c1 only
             day_part = ""
             longing_part = ""
-    
-    # Add weather impulse for mode=None (random) or mode=4
-    if mode is None or mode == 4:
-        weather_code, _, _ = get_current_weather()
-        if weather_code and random.random() < get_weather_probability(weather_code):
-            impulse = get_weather_impulse(weather_code)
-            if impulse:
-                if mode == 4:
-                    vibe_part += f" {impulse}"
-                else:
-                    # For random mode, add as separate part
-                    vibe_part += f" {impulse}"
+    else:
+        # Invalid mode, default to c1 only
+        day_part = ""
+        longing_part = ""
     
     return f"{vibe_part}{day_part}{longing_part}"
 
@@ -896,13 +917,80 @@ def get_weather_probability(weather_code=None):
     return WEATHER_CATEGORY_FREQ.get(category, 0.3)
 
 
-def get_weather_impulse(weather_code=None):
+def get_weather_impulse(weather_code=None, context_str=None):
     """Get weather impulse from library/c4-weather_impulse.txt.
+    
+    Args:
+        weather_code: wttr.in weather code
+        context_str: Optional context from c1 (vibe) or c2 (day note)
     
     Returns: random line from appropriate section, or None
     """
     if weather_code is None:
         return None
+    
+    category = get_weather_category(weather_code)
+    
+    # Map category to section name in file
+    section_map = {
+        "fine": "Fine Day (Sunny / Clear)",
+        "neutral": "Cloudy / Neutral Day",
+        "low_mood": "Fog / Low‑Mood Day",
+        "wet": "Rainy / Wet Day",
+        "bad": "Rainy / Wet Day",  # Same as wet
+        "dangerous": "Storm / Dangerous Day",
+        "cold": "Snow / Cold Day",
+        "windy": "Windy / Caution Day",
+    }
+    
+    section_name = section_map.get(category)
+    if not section_name:
+        return None
+    
+    try:
+        with open("library/c4-weather_impulse.txt", "r") as f:
+            lines = f.readlines()
+        
+        # Find section start and end (handle missing space after ###)
+        start = None
+        end = None
+        
+        expected_header = f"### {section_name} — Weather Impulse Library"
+        expected_header_no_space = f"###{section_name} — Weather Impulse Library"
+        
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            if line_stripped == expected_header or line_stripped == expected_header_no_space:
+                start = i + 1  # Skip header
+            elif start is not None and line_stripped.startswith("###"):
+                end = i
+                break
+        
+        if start is None:
+            return None
+        
+        if end is None:
+            end = len(lines)
+        
+        # Extract lines from section
+        section_lines = lines[start:end]
+        valid_lines = [
+            l.strip() for l in section_lines 
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        
+        if valid_lines:
+            import random
+            impulse = random.choice(valid_lines)
+            
+            # Append context if provided (c1 or c2)
+            if context_str:
+                return f"{impulse} {context_str}"
+            return impulse
+    except Exception as e:
+        logger.warning(f"Weather impulse error: {e}")
+    
+    return None
     
     category = get_weather_category(weather_code)
     

@@ -65,9 +65,7 @@ Logs are saved to `logs/sebastian.log` automatically.
 | Command | Description |
 |---------|-------------|
 | `trigger` | Ask Sebastian to initiate a conversation (random vibe mode) |
-| `trigger vibe 1` | Trigger with vibe only |
-| `trigger vibe 2` | Trigger with vibe + day-of-week commentary |
-| `trigger vibe 3` | Trigger with all three layers (vibe + day + longing) |
+| `trigger vibe <combo> <mode>` | Trigger with specific combo and mode |
 | `pause` | Pause auto-scheduler + proactive |
 | `pause auto` | Pause auto-scheduler only |
 | `pause proactive` | Pause proactive schedule only |
@@ -88,6 +86,18 @@ Logs are saved to `logs/sebastian.log` automatically.
 | `menu` | Show commands menu |
 | `clear` | Clear screen |
 | `quit` | Exit |
+
+### Trigger Vibe Modes
+
+| Command | Mode | Description |
+|---------|------|-------------|
+| `trigger vibe c_only 1` | 1 | c1 only (vibe only) |
+| `trigger vibe c_only 2` | 2 | c1 + c2 (vibe + day note) |
+| `trigger vibe c_only 3` | 3 | c1 + c2 + c3 (vibe + day + longing) |
+| `trigger vibe c_only 4` | 4 | c1 + c4 (vibe + weather impulse) |
+| `trigger vibe a_c 4` | 4 | Intent + vibe + weather |
+| `trigger vibe b_c 4` | 4 | Cue + vibe + weather |
+| `trigger vibe a_b_c 4` | 4 | All + weather |
 
 ## How It Works
 
@@ -133,6 +143,45 @@ Sebastian has two vibe libraries for time-based personality variation:
 - **vibe_library_02.txt**: Night vibes (02:00-06:00 + Sunday)
 
 Each vibe is a character/personality that Sebastian can embody in his response.
+
+### Library Customization (Dynamic Libraries)
+
+Sebastian supports auto-discovery of custom libraries using the `library-X-name.txt` naming pattern:
+
+#### Creating Custom Libraries
+
+1. Create a file named `library-X-descriptive_name.txt` in the `library/` folder:
+   ```
+   library/library-X-meditation.txt
+   library/library-X-workout.txt
+   library/library-X-coding.txt
+   ```
+
+2. Add vibe entries (one per line, lines starting with `#` are ignored):
+   ```
+   # My custom meditation vibes
+   CALM_ZEN: Speak in haikus, maintaining inner peace
+   MINDFUL_OBSERVER: Notice small details in the user's environment
+   BREATH_GUIDE: Gently remind the user to take deep breaths
+   ```
+
+3. Restart Sebastian - libraries are auto-discovered on startup
+
+#### Library Configuration (config.toml)
+
+```toml
+[library]
+enabled = ["vibe_library_01", "vibe_library_02", "X-meditation"]
+disabled = []
+```
+
+- Libraries in `enabled` are loaded (auto-discovered libraries need `X-` prefix)
+- Libraries in `disabled` are skipped even if they exist
+- Default: All libraries in `library/` folder are loaded
+
+#### Sample Library
+
+See `library/SAMPLE-new_library.txt` for a template, and `library/manage_library_guide.txt` for detailed documentation.
 
 ### Day-of-Week Vibe System (Component C)
 
@@ -191,6 +240,82 @@ Edit `prompt_template.txt` to modify how Sebastian uses day notes and longing:
 EXPLICIT_INSTRUCTIONS=Today is {date}. When you see "Day note:" naturally incorporate it as your current emotional state. When you see weekend longing, weave it in as if thinking about the week ahead.
 ```
 
+### Weather Integration (Component C4)
+
+Sebastian integrates real-time weather data via wttr.in API to add weather-based impulses to conversations.
+
+#### Setup
+
+Configure weather settings in `config/config.toml`:
+
+```toml
+[weather]
+location = "Bucharest"  # Your city name
+```
+
+#### How It Works
+
+1. **Weather Fetch**: Sebastian fetches current weather from `wttr.in/{location}?format=j1`
+2. **Code Mapping**: Weather codes are mapped to categories:
+   - `fine` (codes 113-116): Sunny/clear weather
+   - `neutral` (codes 119-122): Cloudy/overcast
+   - `low_mood` (codes 143, 182-186): Fog/mist
+   - `windy` (codes 200-250): Windy/caution conditions
+   - `wet` (codes 263-311): Light/moderate rain
+   - `bad` (codes 314-359): Heavy rain
+   - `dangerous` (codes 386-392): Thunderstorms
+   - `cold` (codes 179, 227-230, 323-338): Snow/ice
+
+3. **Probability**: Weather impulses have different trigger probabilities:
+   - Fine: 10%, Neutral: 30%, Wet: 40%, Bad: 60%, Dangerous: 70%, Cold: 50%
+
+#### Weather Impulse Library
+
+Weather impulses are stored in `library/c4-weather_impulse.txt` with sections:
+- `###Fine Day (Sunny / Clear)`
+- `###Cloudy / Neutral Day`
+- `###Windy / Caution Day`
+- `###Rainy / Wet Day`
+- `###Storm / Dangerous Day`
+- `###Fog / Low‑Mood Day`
+- `###Snow / Cold Day`
+
+Each section contains context-aware impulses that reference the vibe (c1) and day note (c2).
+
+#### Mode 4: 33%/33%/34% Context Distribution
+
+When using `trigger vibe c_only 4` or mode=4, weather impulses are selected with context:
+
+| Context Type | Probability | Description |
+|--------------|-------------|-------------|
+| None | 33% | Weather only, no context |
+| c2 only | 33% | Weather + day note context |
+| c1 + c2 | 34% | Weather + vibe + day note context |
+
+The context is passed to the weather impulse selector, allowing impulses like:
+- *No context*: "Allow the sunny weather to inspire a cheerful remark."
+- *With c2*: "The gray skies mirror the Monday melancholy you mentioned."
+- *With c1+c2*: "Think of a sunny quotation that fits your POETIC vibe on this Tuesday."
+
+#### Usage
+
+```bash
+# Trigger vibe with weather (mode 4)
+trigger vibe c_only 4
+
+# Combine with other components
+trigger vibe a_c 4    # Intent + vibe + weather
+trigger vibe b_c 4    # Cue + vibe + weather
+trigger vibe a_b_c 4  # All components + weather
+```
+
+#### Random Mode Distribution
+
+When `mode=None` (random), Sebastian uses a 33%/33%/34% distribution:
+- 33%: c1 only (vibe only)
+- 33%: c1 + c2 (vibe + day note)
+- 34%: c1 + c2 + c3 (vibe + day note + longing)
+
 ### Combinatorial System
 
 The trigger system combines three components for unique conversations:
@@ -226,17 +351,30 @@ AI-v2/
 ├── sebastian_proactive.py        # Main asyncio version
 ├── sebastian_legacy.py           # Legacy threading version
 ├── scheduler.py                  # Appointment scheduler
-├── proactive_scheduler.py        # Monthly schedule generator
+├── proactive_scheduler.py        # Monthly schedule generator + weather integration
 ├── time_parser.py                # Time parsing
 ├── intent_manager.py             # Intent handling
 ├── cue_manager.py               # Cue system
+├── library_manager.py            # Dynamic library loader
+├── config_manager.py             # Config.toml loader
+├── ollama_params_manager.py      # Ollama parameters loader
 ├── prompt_template.txt           # Customizable prompt template
-├── interaction_intents.txt       # Check-in phrases (component a)
-├── cue_categories.txt            # Cue personalities (component b)
-├── vibe_library_01.txt           # Day vibes (component c)
-├── vibe_library_02.txt          # Night vibes (component c)
-├── week-days.txt                 # Day-of-week vibes (component c)
-├── weekend_longing_interaction.txt # Weekend longing intros (component c)
+├── config/
+│   ├── config.toml              # Main configuration (behavioral settings)
+│   └── ollama_params.toml       # Ollama API parameters (26+ options)
+├── library/
+│   ├── interaction_intents.txt   # Check-in phrases (component a)
+│   ├── cue_categories.txt        # Cue personalities (component b)
+│   ├── vibe_library_01.txt      # Day vibes (component c1)
+│   ├── vibe_library_02.txt      # Night vibes (component c1)
+│   ├── week-days.txt            # Day-of-week vibes (component c2)
+│   ├── weekend_longing_interaction.txt # Weekend longing (component c3)
+│   ├── c4-weather_impulse.txt   # Weather impulses (component c4)
+│   ├── library-X-*.txt          # Custom auto-discovered libraries
+│   ├── SAMPLE-new_library.txt   # Sample format template
+│   └── manage_library_guide.txt # Library customization guide
+├── appointments/
+│   └── *.json                   # Appointment schedule files
 ├── .env.example                  # Config template
 ├── requirements.txt              # Dependencies
 ├── logs/                         # Auto-created, debug logs
@@ -245,7 +383,7 @@ AI-v2/
 
 The following directories are automatically created on first run:
 - `memory/` - Conversation storage (fresh/medium/longterm.json)
-- `appointments.json` - Appointment scheduling
+- `appointments/` - Appointment scheduling files
 - `logs/sebastian.log` - Debug and error logs
 
 These are excluded from git (see .gitignore).
@@ -268,23 +406,49 @@ grep ERROR logs/sebastian.log
 
 ## Configuration Reference
 
-```env
-# Ollama
-OLLAMA_URL=http://localhost:11434              # Ollama server URL
-COMPANION_MODEL=phi4                           # Model to use (phi4, gemma4:26b)
+### config/config.toml
 
-# Scheduler
-SCHEDULER_INTERVAL_MINUTES=5                   # Check interval (minutes)
-AUTOMATIC_ENABLED=true                         # Auto-start scheduler
+```toml
+[app]
+proactive_mode = true          # Enable proactive contacting
+appointment_mode = true       # Enable appointment checking
+interval_seconds = 30         # Check interval (seconds)
+combo_trigger_probability = 0.2  # 20% chance on user messages
 
-# Cues
-CUE_ENABLED=true                               # Enable cue system
-CUE_PROBABILITY=0.2                            # Probability per message (0.0-1.0)
+[user]
+name = "Daniel"               # Your name (used in prompts)
 
-# Memory
-MAX_MEMORY_ENTRIES=50                          # Max entries per tier
-ARCHIVE_THRESHOLD=30                           # Days before archival
+[weather]
+location = "Bucharest"        # City for weather integration
+
+[library]
+enabled = ["vibe_library_01", "vibe_library_02"]
+disabled = []                 # Skip these libraries
+
+[memory]
+fresh_max = 10
+medium_max = 50
+archive_threshold_days = 30
 ```
+
+### config/ollama_params.toml
+
+26+ Ollama API parameters (see file for full list):
+```toml
+[common]
+temperature = 0.7
+top_p = 0.9
+num_ctx = 2048
+
+[streaming]
+stream = true
+stop = ["User:", "Human:"]
+
+[model_specific]
+num_gpu = 999
+```
+
+Use `parameters` command to view current settings, `reset parameters` to restore defaults.
 
 ## License
 

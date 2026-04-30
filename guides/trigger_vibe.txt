@@ -1,0 +1,35 @@
+How trigger vibe Works
+Command format:
+trigger vibe <combo> <mode>
+For mode 1 (c1 only - vibe only):
+trigger vibe c_only 1
+- Builds vibe using build_vibe_prompt(hour, mode=1)
+- Returns only: **[VIBE: NAME]** vibe text
+- No day notes, no longing, no weather
+For mode 4 (c1 + c4 - vibe + weather impulse):
+trigger vibe c_only 4
+- Builds vibe using build_vibe_prompt(hour, mode=4)
+- Returns: **[VIBE: NAME]** vibe text [weather impulse]
+- Weather impulse has 33%/33%/34% context distribution:
+  - 33%: Weather only (no context)
+  - 33%: Weather + c2 (day note context)
+  - 34%: Weather + c1 + c2 (full vibe + day note context)
+Combo system:
+- c_only = only vibe component (c1)
+- a_c = intent (a) + vibe (c)
+- b_c = cue (b) + vibe (c)
+- a_b_c = all three components
+- The combo must include "c" for trigger vibe to work
+What happens when you run it:
+1. handle_command() parses the command (sebastian_proactive.py:588-645)
+2. Calls build_vibe_prompt(hour, mode) (proactive_scheduler.py:273-378)
+3. Mode 1 returns base vibe only (c1)
+4. Mode 4 fetches weather from wttr.in API, picks random impulse from library/c4-weather_impulse.txt based on weather code, and appends it to vibe
+5. The full prompt is sent to Ollama, response printed
+Examples:
+# Just vibe, no extras (c1)
+trigger vibe c_only 1
+# Vibe + weather impulse (c1 + c4)
+trigger vibe c_only 4
+# Intent + vibe + weather (a + c1 + c4)
+trigger vibe a_c 4
