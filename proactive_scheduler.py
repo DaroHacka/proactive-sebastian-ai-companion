@@ -335,37 +335,120 @@ def build_vibe_prompt(hour=None, mode=None):
         day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
         longing_part = f" {longing}" if longing else ""
     elif mode == 4:
-        # c1+c4 (weather) with 33%/33%/33% context distribution
+        # c1+c4 (weather) with configurable distribution
         weather_code, _, _ = get_current_weather()
         if weather_code:
+            # Load distribution weights from config
+            try:
+                import toml
+                with open("config/config.toml") as f:
+                    config = toml.load(f)
+                    w = config.get("weather", {})
+                    explicit_w = w.get("explicit_only_weight", 0.50)
+                    both_w = w.get("both_weight", 0.25)
+            except:
+                explicit_w = 0.50
+                both_w = 0.25
+            
             roll = random.random()
-            context_parts = []
+            weather_type = "unknown"
+            explicit_text = None
+            mood_text = None
             
-            if roll < 0.33:
-                # 33%: Weather only (no context)
-                context_str = None
+            if roll < explicit_w:
+                # 50%: Only explicit mention (c4_explicit_mention.txt)
+                explicit = get_explicit_weather_mention(weather_code)
+                if explicit:
+                    vibe_part += f" {explicit}"
+                    explicit_text = explicit
                 day_part = ""
-            elif roll < 0.66:
-                # 33%: Weather + c2 (day note)
-                day_vibe = get_random_week_day_vibe(day_name)
-                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
-                if day_part:
-                    context_parts.append(f"Day: {day_part}")
-                context_str = ". ".join(context_parts) if context_parts else None
+                longing_part = ""
+                weather_type = "explicit_only"
+                
+            elif roll < explicit_w + both_w:
+                # 25%: Both explicit + mood-based
+                explicit = get_explicit_weather_mention(weather_code)
+                
+                # Mood-based with 33/33/34 context distribution
+                context_parts = []
+                context_roll = random.random()
+                
+                if context_roll < 0.33:
+                    # Weather only (no context)
+                    context_str = None
+                    day_part = ""
+                elif context_roll < 0.66:
+                    # Weather + c2 (day note)
+                    day_vibe = get_random_week_day_vibe(day_name)
+                    day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                    if day_part:
+                        context_parts.append(f"Day: {day_part}")
+                    context_str = ". ".join(context_parts) if context_parts else None
+                else:
+                    # Weather + c1 + c2 (full context)
+                    context_parts.append(f"Vibe: {base_vibe['text']}")
+                    day_vibe = get_random_week_day_vibe(day_name)
+                    day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                    if day_part:
+                        context_parts.append(f"Day: {day_part}")
+                    context_str = ". ".join(context_parts) if context_parts else None
+                
+                # Sometimes put explicit before, sometimes after mood-based
+                mood_impulse = get_weather_impulse(weather_code, context_str)
+                if mood_impulse:
+                    mood_text = mood_impulse
+                    if random.random() < 0.5:
+                        # Explicit before mood
+                        if explicit:
+                            vibe_part += f" {explicit}"
+                            explicit_text = explicit
+                        vibe_part += f" {mood_impulse}"
+                    else:
+                        # Mood before explicit
+                        vibe_part += f" {mood_impulse}"
+                        if explicit:
+                            vibe_part += f" {explicit}"
+                            explicit_text = explicit
+                
+                weather_type = "both"
+                longing_part = ""
+                
             else:
-                # 34%: Weather + c1 + c2 (full context)
-                context_parts.append(f"Vibe: {base_vibe['text']}")
-                day_vibe = get_random_week_day_vibe(day_name)
-                day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
-                if day_part:
-                    context_parts.append(f"Day: {day_part}")
-                context_str = ". ".join(context_parts) if context_parts else None
+                # 25%: Only mood-based (original logic)
+                context_parts = []
+                context_roll = random.random()
+                
+                if context_roll < 0.33:
+                    # Weather only (no context)
+                    context_str = None
+                    day_part = ""
+                elif context_roll < 0.66:
+                    # Weather + c2 (day note)
+                    day_vibe = get_random_week_day_vibe(day_name)
+                    day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                    if day_part:
+                        context_parts.append(f"Day: {day_part}")
+                    context_str = ". ".join(context_parts) if context_parts else None
+                else:
+                    # Weather + c1 + c2 (full context)
+                    context_parts.append(f"Vibe: {base_vibe['text']}")
+                    day_vibe = get_random_week_day_vibe(day_name)
+                    day_part = f". Today is {date_str}. Day note: \"{day_vibe['text']}\"" if day_vibe else ""
+                    if day_part:
+                        context_parts.append(f"Day: {day_part}")
+                    context_str = ". ".join(context_parts) if context_parts else None
+                
+                impulse = get_weather_impulse(weather_code, context_str)
+                if impulse:
+                    mood_text = impulse
+                    vibe_part += f" {impulse}"
+                
+                longing_part = ""
+                weather_type = "mood_only"
             
-            impulse = get_weather_impulse(weather_code, context_str)
-            if impulse:
-                vibe_part += f" {impulse}"
+            # Log which type was selected
+            log_weather_type(weather_code, weather_type, explicit_text, mood_text)
             
-            longing_part = ""
         else:
             # No weather data, fallback to c1 only
             day_part = ""
@@ -861,19 +944,41 @@ def fetch_weather_from_wttr(location=None, format="j1"):
     """Fetch weather from wttr.in.
     
     Args:
-        location: city name, GPS coords, etc. (default: auto-detect from IP)
+        location: city name, GPS coords, etc. (default: from config.toml)
         format: j1=JSON, 1=one-line, etc.
     Returns: JSON dict or None
     """
     if location is None:
-        location = os.getenv("WEATHER_LOCATION", "Paris")
+        # Try to load from config.toml
+        try:
+            import toml
+            with open("config/config.toml") as f:
+                config = toml.load(f)
+                location = config.get("weather", {}).get("location", "Paris")
+        except:
+            location = "Paris"
     
     try:
         response = requests.get(
             f"https://wttr.in/{location}?format={format}",
             timeout=5
         )
-        return response.json()
+        data = response.json()
+        
+        # Save raw weather data to weather_logs/
+        log_dir = "weather_logs"
+        os.makedirs(log_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        location_safe = location.replace(" ", "_")
+        log_file = os.path.join(log_dir, f"{timestamp}_{location_safe}.json")
+        
+        with open(log_file, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        logger.info(f"Weather data saved to {log_file}")
+        
+        return data
     except Exception as e:
         logger.warning(f"Weather fetch failed: {e}")
         return None
@@ -893,6 +998,25 @@ def get_current_weather(location=None):
         weather_code = int(current["weatherCode"])
         desc = current["weatherDesc"][0]["value"]
         temp = int(current["temp_C"])
+        
+        # Save parsed weather data to weather_logs/
+        log_dir = "weather_logs"
+        os.makedirs(log_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        location_safe = location.replace(" ", "_") if location else "unknown"
+        parsed_log = os.path.join(log_dir, f"{timestamp}_{location_safe}_parsed.txt")
+        
+        with open(parsed_log, 'w') as f:
+            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            f.write(f"Location: {location}\n")
+            f.write(f"Weather Code: {weather_code}\n")
+            f.write(f"Description: {desc}\n")
+            f.write(f"Temperature: {temp}°C\n")
+            f.write(f"Category: {get_weather_category(weather_code)}\n")
+        
+        logger.info(f"Parsed weather data saved to {parsed_log}")
+        
         return weather_code, desc, temp
     except (KeyError, IndexError, ValueError) as e:
         logger.warning(f"Weather parse error: {e}")
@@ -981,12 +1105,7 @@ def get_weather_impulse(weather_code=None, context_str=None):
         
         if valid_lines:
             import random
-            impulse = random.choice(valid_lines)
-            
-            # Append context if provided (c1 or c2)
-            if context_str:
-                return f"{impulse} {context_str}"
-            return impulse
+            return random.choice(valid_lines)  # Context used only for selection, not appended
     except Exception as e:
         logger.warning(f"Weather impulse error: {e}")
     
@@ -1043,18 +1162,32 @@ def get_weather_impulse(weather_code=None, context_str=None):
         logger.warning(f"Weather impulse error: {e}")
     
     return None
+
+
+def get_explicit_weather_mention(weather_code=None):
+    """Get explicit weather mention from library/c4_explicit_mention.txt.
+    
+    Args:
+        weather_code: wttr.in weather code
+    
+    Returns: random line from appropriate section, or None
+    """
+    if weather_code is None:
+        return None
     
     category = get_weather_category(weather_code)
     
-    # Map category to section name in file (exact from file)
+    # Map category to section name in c4_explicit_mention.txt
+    # Note: Headers include " (20 entries)" suffix
     section_map = {
-        "fine": "Fine Day (Sunny / Clear)",
-        "neutral": "Cloudy / Neutral Day",
-        "low_mood": "Fog / Low-Mood Day",
-        "wet": "Rainy / Wet Day",
-        "bad": "Rainy / Wet Day",  # Same as wet
-        "dangerous": "Storm / Dangerous Day",
-        "cold": "Snow / Cold Day",
+        "fine": "Sunny / Clear — Explicit Weather Mentions (20 entries)",
+        "neutral": "Cloudy / Neutral — Explicit Weather Mentions (20 entries)",
+        "low_mood": "Fog / Low-Mood — Explicit Weather Mentions (20 entries)",
+        "wet": "Rainy / Wet — Explicit Weather Mentions (20 entries)",
+        "bad": "Storm / Dangerous — Explicit Weather Mentions (20 entries)",  # Same as dangerous
+        "dangerous": "Storm / Dangerous — Explicit Weather Mentions (20 entries)",
+        "cold": "Snow / Cold — Explicit Weather Mentions (20 entries)",
+        "windy": "Windy / Caution — Explicit Weather Mentions (20 entries)",
     }
     
     section_name = section_map.get(category)
@@ -1062,65 +1195,71 @@ def get_weather_impulse(weather_code=None, context_str=None):
         return None
     
     try:
-        with open("library/c4-weather_impulse.txt", "r") as f:
-            content = f.read()
+        with open("library/c4_explicit_mention.txt", "r") as f:
+            lines = f.readlines()
         
-        # Find section by header
-        import re
-        # Pattern: ### Section Name — Weather Impulse Library\n...\n### or end
-        escaped = re.escape(section_name)
-        pattern = rf"### {escaped} — Weather Impulse Library\n(.*?)(?=###|\Z)"
-        match = re.search(pattern, content, re.DOTALL)
+        # Find section start and end (handle both "###Section" and "### Section")
+        start = None
+        end = None
         
-        if match:
-            section = match.group(1)
-            lines = [line.strip() for line in section.split("\n") 
-                      if line.strip() and not line.strip().startswith("#")]
-            if lines:
-                return random.choice(lines)
+        # Try both formats
+        expected_with_space = f"### {section_name}"
+        expected_no_space = f"###{section_name}"
+        
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            if line_stripped == expected_with_space or line_stripped == expected_no_space:
+                start = i + 1
+            elif start is not None and line_stripped.startswith("###"):
+                end = i
+                break
+        
+        if start is None:
+            return None
+        
+        if end is None:
+            end = len(lines)
+        
+        # Extract valid lines (skip comments)
+        section_lines = lines[start:end]
+        valid_lines = [
+            l.strip() for l in section_lines 
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        
+        if valid_lines:
+            import random
+            return random.choice(valid_lines)
     except Exception as e:
-        logger.warning(f"Weather impulse error: {e}")
+        logger.warning(f"Explicit weather mention error: {e}")
     
     return None
+
+
+def log_weather_type(weather_code, weather_type, explicit_text=None, mood_text=None):
+    """Log which weather type was selected to weather_logs/.
     
-    category = get_weather_category(weather_code)
+    Args:
+        weather_code: wttr.in weather code
+        weather_type: "explicit_only", "both", or "mood_only"
+        explicit_text: explicit mention text (if used)
+        mood_text: mood-based impulse text (if used)
+    """
+    log_dir = "weather_logs"
+    os.makedirs(log_dir, exist_ok=True)
     
-    # Map category to section name in file (exact match from file)
-    section_map = {
-        "fine": "Fine Day (Sunny / Clear)",
-        "neutral": "Cloudy / Neutral Day",
-        "low_mood": "Fog / Low-Mood Day",
-        "wet": "Rainy / Wet Day",
-        "bad": "Rainy / Wet Day",  # Same as wet
-        "dangerous": "Storm / Dangerous Day",
-        "cold": "Snow / Cold Day",
-    }
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = os.path.join(log_dir, f"{timestamp}_type.txt")
     
-    section_name = section_map.get(category)
-    if not section_name:
-        return None
-    
-    try:
-        with open("library/c4-weather_impulse.txt", "r") as f:
-            content = f.read()
-        
-        # Find section: ### Section Name — Weather Impulse Library
-        import re
-        # Escape the section name for regex
-        escaped = re.escape(section_name)
-        pattern = rf"### {escaped}.*?— Weather Impulse Library\n(.*?)(?=###|\Z)"
-        match = re.search(pattern, content, re.DOTALL)
-        
-        if match:
-            section = match.group(1)
-            lines = [line.strip() for line in section.split("\n") 
-                      if line.strip() and not line.strip().startswith("#")]
-            if lines:
-                return random.choice(lines)
-    except Exception as e:
-        logger.warning(f"Weather impulse error: {e}")
-    
-    return None
+    with open(log_file, 'w') as f:
+        f.write(f"Weather Type Selected: {weather_type}\n")
+        f.write(f"Weather Code: {weather_code}\n")
+        f.write(f"Category: {get_weather_category(weather_code)}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        if explicit_text:
+            f.write(f"\nExplicit Mention:\n{explicit_text}\n")
+        if mood_text:
+            f.write(f"\nMood-Based Impulse:\n{mood_text}\n")
 
 
 # Auto-initialize on module load

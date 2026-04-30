@@ -1,5 +1,5 @@
 [user]
-name = "Elias"
+name = "Daniel"
 email = "your_email@gmail.com"
 
 [paths]
@@ -38,6 +38,14 @@ weekend_longing_chance = 0.10
 
 [weather]
 location = "Paris"  # User's location for wttr.in
+# c4 distribution weights (must sum to 1.0)
+explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention.txt)
+both_weight = 0.25              # 25%: both explicit + mood-based
+mood_only_weight = 0.25         # 25%: only mood-based (c4-weather-impulse.txt)
+# c4 distribution weights (must sum to 1.0)
+explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention.txt)
+both_weight = 0.25              # 25%: both explicit + mood-based
+mood_only_weight = 0.25         # 25%: only mood-based (c4-weather-impulse.txt)
 
 [combo_weights]
 a_only = 0.20

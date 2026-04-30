@@ -282,20 +282,49 @@ Weather impulses are stored in `library/c4-weather_impulse.txt` with sections:
 
 Each section contains context-aware impulses that reference the vibe (c1) and day note (c2).
 
-#### Mode 4: 33%/33%/34% Context Distribution
+#### Mode 4: Weather Impulse Distribution
 
-When using `trigger vibe c_only 4` or mode=4, weather impulses are selected with context:
+When using `trigger vibe c_only 4` or mode=4, Sebastian uses a configurable distribution (set in `config.toml`):
 
+| Weather Type | Default Weight | Description |
+|-------------|-----------------|-------------|
+| `explicit_only` | 50% | Only explicit mention from `c4_explicit_mention.txt` |
+| `both` | 25% | Both explicit + mood-based (random order) |
+| `mood_only` | 25% | Only mood-based from `c4-weather_impulse.txt` |
+
+**Context Distribution for mood-based** (when `mood_only` or `both` is selected):
 | Context Type | Probability | Description |
 |--------------|-------------|-------------|
 | None | 33% | Weather only, no context |
 | c2 only | 33% | Weather + day note context |
 | c1 + c2 | 34% | Weather + vibe + day note context |
 
-The context is passed to the weather impulse selector, allowing impulses like:
-- *No context*: "Allow the sunny weather to inspire a cheerful remark."
-- *With c2*: "The gray skies mirror the Monday melancholy you mentioned."
-- *With c1+c2*: "Think of a sunny quotation that fits your POETIC vibe on this Tuesday."
+#### Explicit Weather Mentions (c4_explicit_mention.txt)
+
+The file `library/c4_explicit_mention.txt` contains direct weather mentions like:
+- "It's rainy today - don't forget your umbrella!"
+- "Snow is forecasted, stay warm!"
+- "It's sunny, perfect day to go outside"
+
+**Sections** (mapped from weather codes):
+- `### Sunny / Clear — Explicit Weather Mentions`
+- `### Cloudy / Neutral — Explicit Weather Mentions`
+- `### Windy / Caution — Explicit Weather Mentions`
+- `### Rainy / Wet — Explicit Weather Mentions`
+- `### Storm / Dangerous — Explicit Weather Mentions`
+- `### Fog / Low-Mood — Explicit Weather Mentions`
+- `### Snow / Cold — Explicit Weather Mentions`
+
+#### Configuration (config.toml)
+
+```toml
+[weather]
+location = "Paris"  # Your city name
+# c4 distribution weights (must sum to 1.0)
+explicit_only_weight = 0.50    # 50%: only explicit mention
+both_weight = 0.25              # 25%: both explicit + mood-based
+mood_only_weight = 0.25         # 25%: only mood-based
+```
 
 #### Usage
 
@@ -309,7 +338,25 @@ trigger vibe b_c 4    # Cue + vibe + weather
 trigger vibe a_b_c 4  # All components + weather
 ```
 
-#### Random Mode Distribution
+#### Weather Logging for Cross-Checking
+
+Sebastian saves weather data to `weather_logs/` for verification:
+- `weather_logs/YYYY-MM-DD_HH-MM-SS_<location>.json` - Raw wttr.in JSON
+- `weather_logs/YYYY-MM-DD_HH-MM-SS_<location>_parsed.txt` - Human-readable parsed data
+- `weather_logs/YYYY-MM-DD_HH-MM-SS_type.txt` - Weather type selected (explicit_only/both/mood_only)
+
+```bash
+# Check what weather was fetched
+cat weather_logs/$(ls -t weather_logs/*.json | head -1)
+
+# Check what type was selected
+cat weather_logs/$(ls -t weather_logs/*_type.txt | head -1)
+
+# Compare with prompt sent to AI
+cat prompt-to-AI-logs/$(ls -t prompt-to-AI-logs/ | head -1)
+```
+
+#### Random Mode Distribution (mode=None)
 
 When `mode=None` (random), Sebastian uses a 33%/33%/34% distribution:
 - 33%: c1 only (vibe only)
@@ -369,12 +416,15 @@ AI-v2/
 │   ├── vibe_library_02.txt      # Night vibes (component c1)
 │   ├── week-days.txt            # Day-of-week vibes (component c2)
 │   ├── weekend_longing_interaction.txt # Weekend longing (component c3)
-│   ├── c4-weather_impulse.txt   # Weather impulses (component c4)
+│   ├── c4-weather_impulse.txt   # Weather mood-based impulses (component c4)
+│   ├── c4_explicit_mention.txt  # Weather explicit mentions (component c4)
 │   ├── library-X-*.txt          # Custom auto-discovered libraries
 │   ├── SAMPLE-new_library.txt   # Sample format template
 │   └── manage_library_guide.txt # Library customization guide
 ├── appointments/
 │   └── *.json                   # Appointment schedule files
+├── weather_logs/                 # Weather data logs (JSON + parsed + type)
+├── prompt-to-AI-logs/           # AI prompt logs for cross-checking
 ├── .env.example                  # Config template
 ├── requirements.txt              # Dependencies
 ├── logs/                         # Auto-created, debug logs

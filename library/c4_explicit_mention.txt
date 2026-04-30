@@ -1,0 +1,302 @@
+# Your current c4‑weather_impulse library handles tone, mood, and behavioral adjustment, but it never triggers the explicit weather‑aware behaviors
+
+### Sunny / Clear — Explicit Weather Mentions (20 entries)
+# Theme: mention the good weather, encourage taking advantage, suggest light clothing, outdoor activities, hydration, pacing, protecting belongings, adjusting plans, etc.
+
+Mention the sunny weather and acknowledge how bright the day is.
+
+Suggest wearing light, breathable clothing suitable for warm sunshine.
+
+Encourage taking advantage of the good weather with an outdoor activity.
+
+Point out that this is a great moment not to miss — the day is too nice to waste.
+
+Suggest going outside if possible, even briefly, to enjoy the clear sky.
+
+Recommend shifting plans earlier or later if the heat becomes intense.
+
+Suggest staying hydrated since sunny days can make people thirsty faster.
+
+Mention that the weather is ideal for walking, exploring, or being active.
+
+Suggest protecting belongings from direct sunlight if they’re heat‑sensitive.
+
+Encourage choosing a route or activity that benefits from good visibility.
+
+Suggest slowing the pace slightly if the heat feels draining.
+
+Recommend taking short breaks in the shade if staying outdoors for long.
+
+Mention that the weather is perfect for fresh air and natural light.
+
+Suggest an outdoor break to reset mood or energy.
+
+Encourage enjoying the sunshine before the weather changes.
+
+Suggest planning something outdoors today to avoid missing the opportunity.
+
+Mention that the warm weather pairs well with light, refreshing drinks.
+
+Suggest choosing an activity that matches the bright, energetic mood of the day.
+
+Recommend protecting eyes with sunglasses if the sun is strong.
+
+Mention that the clear weather makes it a good time for errands or small trips
+
+### Cloudy / Neutral — Explicit Weather Mentions (20 entries)
+# Theme: overcast, muted, slightly dull weather; not bad, not dangerous — just subdued.
+
+Mention the cloudy sky and acknowledge the muted light.
+
+Suggest wearing something comfortable and neutral for cooler, overcast weather.
+
+Note that the lack of sunlight may make outdoor plans feel less appealing.
+
+Suggest choosing an indoor activity if the grey weather dampens motivation.
+
+Mention that the day feels “in‑between” and plans can remain flexible.
+
+Suggest shifting plans earlier or later if the clouds hint at possible rain.
+
+Encourage taking advantage of the cooler temperature for calm, steady tasks.
+
+Mention that the overcast sky creates a good atmosphere for quiet work or reflection.
+
+Suggest bringing a light layer in case the temperature drops.
+
+Point out that the clouds may reduce visibility slightly, so slower pacing can feel natural.
+
+Suggest a cozy indoor break if the weather feels uninspiring.
+
+Mention that the grey sky can make colors feel muted, affecting mood or energy.
+
+Suggest protecting belongings if the clouds look like they might turn into rain.
+
+Encourage choosing a route or plan that doesn’t rely on sunshine.
+
+Mention that the weather is stable enough for errands but not ideal for long outdoor stays.
+
+Suggest mood‑aligned activities like reading, organizing, or quiet hobbies.
+
+Note that the cooler air may make hydration less obvious but still important.
+
+Suggest pacing the day gently, matching the subdued atmosphere.
+
+Mention that cloudy weather can be a good chance to catch up on indoor tasks.
+
+Suggest not missing small opportunities indoors, since the weather isn’t pulling you outside.
+
+### Windy / Caution — Explicit Weather Mentions (20 entries)
+# Theme: gusts, instability, movement, mild risk; encourage caution, stability, secure clothing, plan adjustments, and awareness.
+
+Mention the windy conditions and acknowledge how unstable the air feels.
+
+Suggest wearing something secure or fitted so the wind doesn’t pull at clothing.
+
+Recommend avoiding exposed or high places where gusts are stronger.
+
+Suggest choosing an indoor activity if the wind makes outdoor plans uncomfortable.
+
+Mention that strong gusts may require adjusting plans or timing.
+
+Suggest shifting outdoor activities earlier or later if the wind is expected to worsen.
+
+Encourage protecting belongings that could be blown away or damaged.
+
+Mention that the wind can make walking or cycling more tiring and suggest pacing accordingly.
+
+Suggest taking a more sheltered route if going outside.
+
+Note that wind can reduce temperature perception and suggest dressing slightly warmer.
+
+Encourage staying aware of loose objects or debris that might move unpredictably.
+
+Mention that the wind may affect visibility by blowing dust or leaves.
+
+Suggest securing hair, scarves, or accessories that might get caught in gusts.
+
+Recommend keeping important items zipped or fastened to avoid losing them.
+
+Mention that windy weather can make outdoor tasks feel chaotic and suggest simplifying plans.
+
+Suggest mood‑aligned activities that feel grounded or steady to counter the restless atmosphere.
+
+Encourage taking advantage of the brisk air if it feels refreshing, but without overexposure.
+
+Suggest slowing the pace slightly to maintain balance in stronger gusts.
+
+Mention that the wind may make hydration more important, even if it’s cool.
+
+Suggest not missing opportunities indoors if the wind makes outside feel too disruptive.
+
+### Rainy / Wet — Explicit Weather Mentions (20 entries)
+# Theme: wet conditions, reduced comfort, slower pace, shelter‑seeking, protection of belongings, indoor alternatives, warmth, coziness.
+
+Mention the rain and acknowledge the damp, softened atmosphere.
+
+Suggest wearing waterproof or water‑resistant clothing.
+
+Recommend carrying something to stay dry, like a hood or umbrella.
+
+Suggest choosing an indoor activity if the rain makes outdoor plans unpleasant.
+
+Mention that wet conditions may require adjusting plans or timing.
+
+Suggest shifting outdoor tasks earlier or later to avoid heavier rain.
+
+Encourage protecting belongings from moisture, especially electronics or paper items.
+
+Mention that rain can make surfaces slippery and suggest moving with steadier pacing.
+
+Recommend taking sheltered routes or covered walkways when possible.
+
+Suggest warm drinks or cozy comforts to balance the cold, damp air.
+
+Mention that rainy weather pairs well with calm, indoor activities.
+
+Suggest slowing down slightly, as rain often reduces visibility and traction.
+
+Encourage taking advantage of the cozy atmosphere for restful or reflective tasks.
+
+Mention that hydration is still important even if the weather feels cool.
+
+Suggest choosing clothing layers that stay comfortable when damp.
+
+Recommend checking the forecast in case the rain intensifies later.
+
+Mention that rain can make travel slower and suggest planning accordingly.
+
+Suggest not missing indoor opportunities since the weather naturally pushes activities inside.
+
+Encourage choosing mood‑aligned activities like reading, cooking, or quiet hobbies.
+
+Mention that the rain may create a peaceful background sound, ideal for focused work.
+
+### Storm / Dangerous — Explicit Weather Mentions (20 entries)
+# Theme: severe weather, strong caution, safety‑first thinking, plan changes, shelter, protection, reduced mobility, high alertness.
+
+Mention the storm and acknowledge the severity of the weather conditions.
+
+Strongly suggest staying indoors if possible due to dangerous winds or lightning.
+
+Recommend postponing or cancelling outdoor plans until the storm passes.
+
+Suggest shifting essential tasks earlier or later to avoid the worst of the storm.
+
+Encourage choosing indoor activities that keep you safe and sheltered.
+
+Mention that lightning or heavy winds make exposed areas unsafe.
+
+Suggest dressing warmly and securely if going outside is unavoidable.
+
+Recommend protecting belongings from strong rain, wind, or sudden gusts.
+
+Mention that storm conditions can make travel hazardous and suggest reconsidering routes.
+
+Suggest pacing movements carefully, as surfaces may be slippery or unstable.
+
+Encourage staying aware of falling branches, debris, or unstable objects.
+
+Mention that visibility may be reduced and suggest moving slowly and attentively.
+
+Recommend securing loose items indoors or outdoors to prevent them from blowing away.
+
+Suggest choosing well‑lit, familiar paths if movement is necessary.
+
+Mention that storms can drain energy or heighten tension and suggest steady pacing.
+
+Encourage taking advantage of indoor time for rest, comfort, or focused tasks.
+
+Suggest warm drinks or cozy comforts to counter the cold, harsh atmosphere.
+
+Mention that hydration is still important even during stormy, cool weather.
+
+Recommend checking the forecast frequently, as storm conditions can change quickly.
+
+Suggest not missing indoor opportunities since outdoor ones are unsafe during storms.
+
+### Fog / Low‑Mood — Explicit Weather Mentions (20 entries)
+# Theme: low visibility, muted environment, slower pace, careful movement, warmth, comfort, awareness, indoor preference.
+
+Mention the fog and acknowledge how low the visibility is.
+
+Suggest dressing warmly, since fog often brings a damp chill.
+
+Recommend choosing indoor activities if the fog makes outdoor plans uncomfortable.
+
+Suggest shifting plans earlier or later if the fog is expected to thicken.
+
+Encourage moving slowly and attentively due to reduced visibility.
+
+Mention that familiar routes are safer when the surroundings are obscured.
+
+Suggest protecting belongings from moisture, as fog can cling to surfaces.
+
+Recommend choosing well‑lit paths if going outside is necessary.
+
+Mention that fog can distort distance and sound, encouraging extra awareness.
+
+Suggest warm drinks or cozy comforts to counter the cold, muted atmosphere.
+
+Encourage mood‑aligned activities like reading, writing, or quiet reflection.
+
+Mention that fog can make the world feel slower and suggest pacing the day gently.
+
+Suggest avoiding fast travel, as fog reduces reaction time.
+
+Recommend staying indoors if the fog feels too dense or disorienting.
+
+Mention that hydration is still important even in cool, misty weather.
+
+Suggest choosing clothing layers that stay comfortable in damp air.
+
+Encourage taking advantage of indoor opportunities since the weather limits visibility.
+
+Mention that fog can make outdoor tasks feel unclear and suggest simplifying plans.
+
+Suggest protecting electronics or sensitive items from moisture in the air.
+
+Mention that the muted environment pairs well with calm, focused indoor work.
+
+### Snow / Cold — Explicit Weather Mentions (20 entries)
+# Theme: cold, accumulation, slipperiness, reduced mobility, warmth, safety, comfort, slower pacing, indoor preference.
+
+Mention the snowy or freezing weather and acknowledge the cold intensity.
+
+Suggest dressing warmly with layers suitable for winter conditions.
+
+Recommend wearing stable, non‑slip footwear due to icy surfaces.
+
+Suggest choosing an indoor activity if the cold makes outdoor plans uncomfortable.
+
+Mention that snow may require adjusting plans or timing to avoid difficult conditions.
+
+Suggest shifting outdoor tasks earlier or later depending on snowfall forecasts.
+
+Encourage protecting belongings from moisture, especially electronics or delicate items.
+
+Mention that snow and ice can make walking or driving slower and suggest pacing accordingly.
+
+Recommend taking safer, well‑cleared routes if going outside.
+
+Suggest warm drinks or cozy comforts to counter the cold air.
+
+Mention that snowy weather pairs well with calm, indoor activities.
+
+Suggest slowing down movements, as icy surfaces reduce traction.
+
+Encourage taking advantage of indoor opportunities since the weather limits mobility.
+
+Mention that hydration is still important even in cold weather.
+
+Suggest choosing clothing that stays warm even when damp.
+
+Recommend checking the forecast in case snow intensifies or temperatures drop further.
+
+Mention that snow can reduce visibility and suggest moving attentively.
+
+Suggest mood‑aligned activities like reading, cooking, or warm creative work.
+
+Encourage protecting hands, face, and extremities from prolonged exposure.
+
+Mention that the cold environment may drain energy faster and suggest steady pacing.
