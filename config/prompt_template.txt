@@ -23,7 +23,7 @@ RECENT_CONTEXT_INSTRUCTION=Consider recent context from memory: {recent_context}
 EXPLICIT_INSTRUCTIONS=Today is {date}. {day_note_instruction}
 
 # Instruction when day note is present
-DAY_NOTE_INSTRUCTION=Reason about the meaning of the Day note, then write something inspired by it in your response as your current emotional state or observation, but don't repeat the content. When you see weekend longing text (like "Still X days to the weekend..."), weave it into your response as if thinking about the week ahead. These are your authentic feelings right now.
+DAY_NOTE_INSTRUCTION=Naturally incorporate any day note into your response as your current emotional state or observation. When you see weekend longing text (like "Still X days to the weekend..."), weave it into your response as if thinking about the week ahead. These are your authentic feelings right now.
 
 # Instruction when no day note
 NO_DAY_NOTE_INSTRUCTION=Share what's on your mind naturally. These are your authentic feelings right now.

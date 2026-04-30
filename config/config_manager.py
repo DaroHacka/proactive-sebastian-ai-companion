@@ -221,6 +221,46 @@ def validate_combo_weights(config: dict = None) -> tuple:
     return weights, normalized, warning
 
 
+def get_library_config(lib_key=None):
+    """Get library configuration from config.toml, merged with LIBRARIES defaults."""
+    config = get_config().get("libraries", {})
+    
+    if lib_key:
+        # Return config for specific library
+        return config.get(lib_key, {})
+    
+    return config
+
+
+def validate_libraries():
+    """Validate library configuration."""
+    warnings = []
+    
+    # Check all enabled libraries have valid files
+    from library_manager import LIBRARIES
+    import os
+    
+    for key, lib in LIBRARIES.items():
+        if not lib.get("enabled", True):
+            continue
+        
+        # Check weight_bias is positive
+        bias = lib.get("weight_bias", 1.0)
+        if bias <= 0:
+            warnings.append(f"Library {key}: weight_bias must be positive (got {bias})")
+        
+        # Check file exists
+        file_path = lib.get("file")
+        if isinstance(file_path, list):
+            for f in file_path:
+                if not os.path.exists(f):
+                    warnings.append(f"Library {key}: file not found: {f}")
+        elif not os.path.exists(file_path):
+            warnings.append(f"Library {key}: file not found: {file_path}")
+    
+    return warnings
+
+
 def save_config(config_path: str = None):
     """Save current config to file."""
     global _config

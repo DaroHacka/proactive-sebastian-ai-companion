@@ -109,11 +109,16 @@ from proactive_scheduler import (
     get_current_date_info,
 )
 
-# ==================== COMBINATORIAL SYSTEM ====================
-COMBINATION_WEIGHTS = {
-    "a_only": 0.20, "b_only": 0.10, "c_only": 0.15,
-    "a_b": 0.15, "a_c": 0.20, "b_c": 0.10, "a_b_c": 0.10,
-}
+# ==================== LIBRARY MANAGER ====================
+from library_manager import (
+    generate_combo_weights,
+    get_normal_libraries,
+    get_special_libraries,
+    get_loader,
+)
+
+# Auto-generated from library_manager.LIBRARIES
+COMBINATION_WEIGHTS = generate_combo_weights()
 
 SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short."""
 
@@ -210,17 +215,36 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     else:
         day_note_instruction = no_day_note_instr
     
-    # Build task instructions based on combo
-    prompts = {
-        "a_only": f"""Pick up this topic: "{intent}". Take inspiration from it, don't be literal, improvise. Start a natural conversation. Context: {context_str}""",
-        "b_only": f"""You are playing as: "{cue_desc}". Take inspiration from it, don't be literal, improvise. Start a conversation. Context: {context_str}""",
-        "c_only": f"""Take inspiration, don't be literal, improvise. In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Context: {context_str}""",
-        "a_b": f"""Pick up this topic: "{intent}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Also: "{intent}". Context: {context_str}""",
-        "b_c": f"""In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}". Also playing as: "{cue_desc}". Context: {context_str}""",
-        "a_b_c": f"""Topic: "{intent}", vibe: "{vibe_text}", cue: "{cue_desc}". Context: {context_str}""",
-    }
-    task_instructions = prompts.get(combo, prompts["a_only"])
+    # Build task instructions dynamically based on combo letters
+    task_parts = []
+    
+    if "a" in combo:
+        intent = get_random_intent()
+        task_parts.append(f'Pick up this topic: "{intent}"')
+    
+    if "b" in combo:
+        cue_code, cue_desc, _ = get_random_cue()
+        task_parts.append(f'Also playing as: "{cue_desc}"')
+        # Store for later reference
+        task_parts.append(f'Context: {context_str}')
+    
+    if "c" in combo:
+        task_parts.append(f'In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}"')
+    
+    # Handle special libraries (max_combo > 3)
+    special_libs = get_special_libraries()
+    for lib_key in combo.split("_"):
+        if lib_key + "_only" == combo:  # Convert "weather_only" to "weather"
+            lib_key = combo.replace("_only", "")
+        if lib_key not in ["a", "b", "c"] and lib_key in special_libs:
+            loader = get_loader(lib_key)
+            if loader:
+                task_parts.append(f'Also: "{loader()}"')
+    
+    if not task_parts:
+        task_parts.append(f"Context: {context_str}")
+    
+    task_instructions = ". ".join(task_parts)
     
     # Replace {recent_context} placeholder if present in context
     recent_context = ""
@@ -553,41 +577,51 @@ async def handle_command(cmd):
         print(f"\nSebastian: {response}")
         return
     
-    # ===== TRIGGER VIBE (testing modes) =====
+    # ===== TRIGGER VIBE (testing combos + modes) =====
     if cmd.startswith("trigger vibe "):
-        try:
-            mode = int(cmd.split()[2])
-            if mode not in [1, 2, 3]:
-                print("[Usage: trigger vibe 1/2/3]")
-                print("  1 = vibe only")
-                print("  2 = vibe + week-days")
-                print("  3 = all three (vibe + week-days + longing)")
-                return
-        except (IndexError, ValueError):
-            print("[Usage: trigger vibe 1/2/3]")
-            print("  1 = vibe only")
-            print("  2 = vibe + week-days")
-            print("  3 = all three (vibe + week-days + longing)")
+        parts = cmd.split()
+        
+        # Parse: trigger vibe [combo] [mode]
+        if len(parts) < 3:
+            print("[Usage: trigger vibe <combo> <mode>]")
+            print("  combo: a_only, b_only, a_b, a_c, b_c, a_b_c, f_g_c, etc.")
+            print("  mode: 1=vibe only, 2=+weekdays, 3=+longing")
             return
         
-        print(f"\n[Triggering vibe mode {mode}...]")
-        hour = datetime.now().hour
+        combo_arg = parts[2]
+        mode = int(parts[3]) if len(parts) >= 4 else 1
         
-        # Use a_b_c combo with specified mode
-        combo = "a_b_c"
-        intent = get_random_intent()
-        cue_code, cue_desc, _ = get_random_cue()
+        if mode not in [1, 2, 3]:
+            print("[Mode must be 1, 2, or 3]")
+            return
+        
+        # Convert single letter to _only format
+        if "_" not in combo_arg and len(combo_arg) == 1:
+            combo = combo_arg + "_only"
+        else:
+            combo = combo_arg
+        
+        print(f"\n[Triggering combo {combo} with vibe mode {mode}...]")
+        hour = datetime.now().hour
         
         # Show what was picked
         print(f"Combination: {combo}")
         print(f" Mode: {mode}")
         print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
-        print(f" Intent: {intent[:60]}...")
-        print(f" Cue: {cue_code}")
         
-        # Build and show vibe
-        vibe_text = build_vibe_prompt(hour, mode)
-        print(f" Vibe: {vibe_text[:100]}...")
+        # Dynamically load components based on combo
+        intent = get_random_intent() if "a" in combo else None
+        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+        
+        if intent:
+            print(f" Intent: {intent[:60]}...")
+        if cue_code:
+            print(f" Cue: {cue_code}")
+        
+        # Build and show vibe (if c in combo)
+        if "c" in combo:
+            vibe_text = build_vibe_prompt(hour, mode)
+            print(f" Vibe: {vibe_text[:100]}...")
         
         # Build context and prompt
         context = "Activity: manual trigger"
@@ -684,7 +718,8 @@ async def handle_command(cmd):
     if cmd == "menu":
         print("\nCommands:")
         print("  trigger       - Trigger proactive conversation")
-        print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
+        print("  trigger vibe <combo> <mode> - Test vibe modes (combo=a_b_c, mode=1/2/3)")
+        print("                1=vibe, 2=+weekdays, 3=+longing")
         print("  pause proactive - Pause proactive schedule")
         print("  pause appointment - Pause appointment check")
         print("  resume proactive - Resume proactive schedule")
@@ -733,7 +768,8 @@ async def async_main():
     print("=" * 50)
     print("\nCommands:")
     print("  trigger       - Trigger proactive conversation")
-    print("  trigger vibe 1/2/3 - Test vibe modes (1=vibe, 2=+weekdays, 3=+longing)")
+    print("  trigger vibe <combo> <mode> - Test vibe modes (combo=a_b_c, mode=1/2/3)")
+    print("                1=vibe, 2=+weekdays, 3=+longing")
     print("  pause proactive - Pause proactive schedule")
     print("  pause appointment - Pause appointment check")
     print("  resume proactive - Resume proactive schedule")

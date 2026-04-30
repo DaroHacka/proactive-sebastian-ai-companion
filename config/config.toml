@@ -45,6 +45,22 @@ a_c = 0.20
 b_c = 0.10
 a_b_c = 0.10
 
+[libraries]
+  [libraries.a]
+    weight_bias = 1.0
+    max_combo = 3
+    enabled = true
+  
+  [libraries.b]
+    weight_bias = 1.0
+    max_combo = 3
+    enabled = true
+  
+  [libraries.c]
+    weight_bias = 2.0
+    max_combo = 3
+    enabled = true
+
 [schedule]
 contacts_sparse_min = 2
 contacts_sparse_max = 4
