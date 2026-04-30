@@ -231,15 +231,22 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     if "c" in combo:
         task_parts.append(f'In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}"')
     
-    # Handle special libraries (max_combo > 3)
-    special_libs = get_special_libraries()
-    for lib_key in combo.split("_"):
-        if lib_key + "_only" == combo:  # Convert "weather_only" to "weather"
-            lib_key = combo.replace("_only", "")
-        if lib_key not in ["a", "b", "c"] and lib_key in special_libs:
+    # Handle additional libraries (d, e, f, etc.)
+    # Parse combo to find all library keys
+    combo_keys = combo.replace("_only", "").split("_")
+    
+    for lib_key in combo_keys:
+        if lib_key in ["a", "b", "c"]:
+            continue  # Already handled above
+        
+        # Check if it's a valid library
+        from library_manager import LIBRARIES
+        if lib_key in LIBRARIES:
             loader = get_loader(lib_key)
             if loader:
-                task_parts.append(f'Also: "{loader()}"')
+                result = loader()
+                if result:
+                    task_parts.append(f'Also: "{result}"')
     
     if not task_parts:
         task_parts.append(f"Context: {context_str}")

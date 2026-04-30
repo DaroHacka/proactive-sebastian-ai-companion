@@ -1,0 +1,144 @@
+# Library Management Guide for Sebastian AI
+
+## 1. Auto-Discovered Libraries
+
+### Naming Convention
+Files must follow this pattern to be auto-discovered:
+```
+library-X-name.txt
+```
+Where:
+- `X` = single letter ID (d, e, f, etc.)
+- `name` = descriptive name
+
+Examples:
+- `library-d-books.txt` → Library "d" (books)
+- `library-e-movies.txt` → Library "e" (movies)
+- `library-f-weather.txt` → Library "f" (weather)
+
+### GROUPING LIBRARIES
+Multiple files with the SAME letter are grouped as ONE library:
+```
+library-d-books.txt
+library-d-classics.txt
+```
+Both files become part of library "d" - entries from both files can appear.
+
+### Comment Lines
+Lines starting with `#` (one or more) are IGNORED by the default loader:
+```
+# This is a comment - won't be picked
+### This is also a comment (multiple #)
+"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.  # This line IS picked
+```
+
+### Format
+Each non-comment line = one valid entry:
+```
+"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
+"1984" by George Orwell - Dystopian surveillance state.
+"Dune" by Frank Herbert - Desert planet politics and spice.
+```
+
+---
+
+## 2. How It Works
+
+### On Startup
+1. `library_manager.py` scans `library/` folder
+2. Finds all files matching `library-X-name.txt`
+3. Groups by letter X
+4. Adds to `LIBRARIES` dict with `auto_discovered=True`
+5. Auto-generates combo weights (including new library)
+6. If files are deleted → library auto-removed on next restart
+
+### Default Loader
+For auto-discovered libraries, the default loader:
+1. Picks a random file from all files for that letter
+2. Picks a random non-comment line from that file
+3. Returns it as the library entry
+
+### IN COMBOS
+New libraries appear in auto-generated combos:
+- `d_only` (just library d)
+- `a_d`, `b_d`, `c_d` (pairs)
+- `a_b_d`, `a_c_d`, `b_c_d` (triples)
+- `a_b_c_d` (if 4 letters)
+
+Weights are calculated automatically based on `weight_bias`.
+
+---
+
+## 3. Custom Loading (Optional)
+
+If you need special loading logic (like vibe library with time ranges):
+
+### Step 1: Create a loader function
+In a new or existing manager file:
+```python
+# In book_manager.py
+def get_random_book():
+    """Custom loader for books library."""
+    import random
+    with open("library/d-books.txt", "r") as f:
+        lines = [l.strip() for l in f if l.strip() and not l.strip().startswith("#")]
+    return random.choice(lines) if lines else None
+```
+
+### Step 2: Register in `library_manager.py`
+```python
+LIBRARIES["d"] = {
+    "name": "books",
+    "file": "library/d-books.txt",
+    "loader_module": "book_manager",
+    "loader_func": "get_random_book",
+    "weight_bias": 1.0,
+    "max_combo": 3,
+    "enabled": True,
+    "auto_discovered": False,  # Manually registered
+}
+```
+
+---
+
+## 4. Hardcoded vs. Auto-Discovered
+
+| Type | Libraries | Loading | File Pattern |
+|------|-----------|---------|---------------|
+| **Hardcoded** | a (intents), b (cues), c (vibes) | Custom functions | Any filename |
+| **Auto-Discovered** | d, e, f... | Default loader (or custom) | `library-X-name.txt` |
+
+---
+
+## 5. Sample Files
+
+- `library/SAMPLE-new_library.txt` - Example of format (NOT auto-discovered - no `library-X-` prefix)
+- `library/sample-new_library.txt` - This file (lowercase s, also NOT auto-discovered)
+
+---
+
+## 6. Quick Reference
+
+### To ADD a new library:
+1. Create `library-X-name.txt`
+2. Add entries (one per line)
+3. Restart Sebastian → auto-discovered!
+
+### To REMOVE a library:
+1. Delete `library-X-name.txt`
+2. Restart Sebastian → auto-removed!
+
+### To GROUP libraries:
+Use same letter X in multiple files:
+```
+library-d-books.txt
+library-d-movies.txt
+```
+Both grouped as library "d".
+
+### To EXCLUDE lines:
+Start line with `#`:
+```
+# This won't be picked
+This will be picked
+```

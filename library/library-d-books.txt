@@ -1,0 +1,5 @@
+# Books library - auto-discovered
+"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
+"1984" by George Orwell - Dystopian surveillance state.
+"Dune" by Frank Herbert - Desert planet politics and spice.
+"The Hobbit" by J.R.R. Tolkien - Unexpected journey with dwarves.
