@@ -329,7 +329,7 @@ async def proactive_monitor():
             continue
         
         # Check PROACTIVE_MODE at RUNTIME, not import time
-        if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true':
+        if PROACTIVE_MODE:
             await check_proactive()
         
         await asyncio.sleep(30)  # Check every 30 seconds
@@ -718,7 +718,7 @@ async def handle_command(cmd):
     # ===== STATUS =====
     if cmd == "status":
         print(f"\n[Status]")
-        print(f"  Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}")
+        print(f"  Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}")
         
         # Appointment check status
         appt_mode = os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true'
@@ -847,7 +847,7 @@ async def async_main():
     print("  quit      - Exit")
     print("  reset parameters - Reset to defaults and quit")
     print()
-    print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'false').lower() == 'true' else 'OFF'}]")
+    print(f"[Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}]")
     print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
     print(f"[Model: {os.getenv('COMPANION_MODEL', 'phi4')}]")
     print(f"[Interval: {_global_interval}min]")
