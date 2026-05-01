@@ -15,6 +15,7 @@ available_models = ["phi4", "gemma4:26b"]
 
 [system]
 proactive_mode = true
+proactive_on_launch = true   # true = proactive ON at launch, false = OFF at launch
 appointment_mode = true
 memory_in_prompt = false
 test_mode = true
@@ -75,3 +76,26 @@ contacts_active_min = 5
 contacts_active_max = 15
 active_day_percentage = 0.30
 frequency = 3  # 1-10 scale (3 = light schedule, 5 = balanced, 10 = maximum)
+
+[schedule.distribution]
+# Time-based distribution for proactive contacts (must sum to 1.0)
+# Users can customize the hour ranges
+early_morning_start = 0
+early_morning_end = 6
+early_morning_weight = 0.10
+
+morning_start = 6
+morning_end = 12
+morning_weight = 0.30
+
+afternoon_start = 12
+afternoon_end = 18
+afternoon_weight = 0.40
+
+evening_start = 18
+evening_end = 22
+evening_weight = 0.15
+
+night_start = 22
+night_end = 24
+night_weight = 0.05

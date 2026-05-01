@@ -581,7 +581,7 @@ def is_special_date(day_date):
     return None
 
 
-def generate_daily_contacts(day_date):
+def generate_daily_contacts(day_date, hour=None):
     """Generate number of contacts for a day.
     
     Uses frequency parameter from config (1-10 scale):
@@ -589,15 +589,19 @@ def generate_daily_contacts(day_date):
     - frequency=3: light (default)
     - frequency=5: balanced (current default)
     - frequency=10: maximum (up to 24 contacts/day)
+    
+    Also uses time-based distribution from [schedule.distribution] if hour is provided.
     """
-    # Load frequency from config
+    # Load frequency and distribution from config
     try:
         import toml
         with open("config/config.toml") as f:
             config = toml.load(f)
             frequency = config.get("schedule", {}).get("frequency", 3)
+            dist = config.get("schedule.distribution", {})
     except:
         frequency = 3  # Default: light schedule
+        dist = {}
     
     # Check for special date
     special = is_special_date(day_date)
@@ -622,6 +626,31 @@ def generate_daily_contacts(day_date):
     
     # Active day percentage increases with frequency
     active_pct = 0.10 + t * 0.80  # 10%-90%
+    
+    # Time-based distribution (if hour provided)
+    if hour is not None and dist:
+        # Determine time period
+        time_periods = [
+            ("early_morning", dist.get("early_morning_start", 0), dist.get("early_morning_end", 6)),
+            ("morning", dist.get("morning_start", 6), dist.get("morning_end", 12)),
+            ("afternoon", dist.get("afternoon_start", 12), dist.get("afternoon_end", 18)),
+            ("evening", dist.get("evening_start", 18), dist.get("evening_end", 22)),
+            ("night", dist.get("night_start", 22), dist.get("night_end", 24)),
+        ]
+        
+        # Find which period the hour belongs to
+        current_period = "morning"  # default
+        for name, start, end in time_periods:
+            if start <= hour < end:
+                current_period = name
+                break
+        
+        # Get weight for this period
+        weight = dist.get(f"{current_period}_weight", 0.20)
+        
+        # If weight is low, return 0 contacts (skip this hour)
+        if random.random() > weight * 3:  # Multiply by 3 to make it more effective
+            return 0, None
     
     # Random day
     if random.random() < active_pct:

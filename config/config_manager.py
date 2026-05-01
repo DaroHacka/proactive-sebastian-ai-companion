@@ -96,6 +96,11 @@ def is_proactive_mode() -> bool:
     return get_config().get("system", {}).get("proactive_mode", True)
 
 
+def is_proactive_on_launch() -> bool:
+    """Check if proactive should be ON at launch (system.proactive_on_launch)."""
+    return get_config().get("system", {}).get("proactive_on_launch", True)
+
+
 def is_appointment_mode() -> bool:
     """Check if appointment mode is enabled."""
     return get_config().get("system", {}).get("appointment_mode", True)

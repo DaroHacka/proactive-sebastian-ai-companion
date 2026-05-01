@@ -24,16 +24,18 @@ load_dotenv()
 
 # Try to load config.toml for startup defaults, fallback to .env values
 try:
-    from config.config_manager import is_proactive_on_startup, is_appointment_on_startup
+    from config.config_manager import is_proactive_on_startup, is_appointment_on_startup, is_proactive_on_launch
     PROACTIVE_DEFAULT = is_proactive_on_startup()
+    PROACTIVE_LAUNCH = is_proactive_on_launch()
     APPOINTMENT_DEFAULT = is_appointment_on_startup()
 except ImportError:
     # Fallback to .env values if config not available
     PROACTIVE_DEFAULT = True
+    PROACTIVE_LAUNCH = True
     APPOINTMENT_DEFAULT = True
 
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
-PROACTIVE_MODE = os.getenv("PROACTIVE_MODE", "true" if PROACTIVE_DEFAULT else "false").lower() == "true"
+PROACTIVE_MODE = os.getenv("PROACTIVE_MODE", "true" if PROACTIVE_LAUNCH else "false").lower() == "true"
 
 # ==================== LOGGING ====================
 LOG_DIR = "logs"
@@ -57,6 +59,9 @@ MEMORY_DIR = "memory"
 PROMPT_LOG_DIR = "prompt-to-AI-logs"
 STATE_FILE = "state.json"
 LAST_INTERACTION_FILE = "last_interaction.json"
+CONVERSATION_DIR = "conversation"
+if not os.path.exists(CONVERSATION_DIR):
+    os.makedirs(CONVERSATION_DIR)
 APPOINTMENTS_FILE = "appointments/appointments.json"
 MAX_MEMORY_ENTRIES = int(os.getenv("MAX_MEMORY_ENTRIES", "50"))
 ARCHIVE_THRESHOLD = int(os.getenv("ARCHIVE_THRESHOLD", "30"))
@@ -677,6 +682,39 @@ async def handle_command(cmd):
         print("[All data cleared]")
         return
     
+    # ===== SAVE CONVERSATION =====
+    if cmd == "save":
+        # Load last interaction (user message + AI response)
+        try:
+            with open(LAST_INTERACTION_FILE) as f:
+                data = json.load(f)
+                user_msg = data.get("user_message", "")
+                ai_msg = data.get("ai_message", "")
+        except:
+            print("[No conversation to save]")
+            return
+        
+        if not user_msg and not ai_msg:
+            print("[No conversation to save]")
+            return
+        
+        # Create filename: YYYY-MM-DD_HH-MM-SS_first_60_chars.txt
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        # Clean user message for filename
+        clean_msg = user_msg[:60].replace("/", "_").replace("\\", "_").replace(" ", "_")
+        clean_msg = "".join(c for c in clean_msg if c.isalnum() or c in "_-")
+        filename = f"{timestamp}_{clean_msg}.txt"
+        filepath = os.path.join(CONVERSATION_DIR, filename)
+        
+        # Save conversation
+        with open(filepath, "w") as f:
+            f.write(f"Timestamp: {datetime.now().isoformat()}\n\n")
+            f.write(f"User: {user_msg}\n\n")
+            f.write(f"Sebastian: {ai_msg}\n")
+        
+        print(f"[Conversation saved to {filepath}]")
+        return
+    
     # ===== STATUS =====
     if cmd == "status":
         print(f"\n[Status]")
@@ -741,6 +779,7 @@ async def handle_command(cmd):
         print("  memory on   - Include recent memory in prompts")
         print("  memory off  - Exclude recent memory from prompts")
         print("  model X     - Switch model (phi4, gemma4)")
+        print("  save        - Save current conversation to disk")
         print("  menu      - Show this commands menu")
         print("  clear     - Clear screen")
         print("  quit      - Exit")
@@ -756,7 +795,18 @@ async def handle_command(cmd):
     else:
         # Unknown command: send to AI as free text
         response = await send_to_ollama(cmd)
-    print(f"\nSebastian: {response}")
+        print(f"\nSebastian: {response}")
+    
+    # Save last interaction for "save" command
+    try:
+        with open(LAST_INTERACTION_FILE, "w") as f:
+            json.dump({
+                "user_message": cmd if not cmd.startswith("trigger") else "",
+                "ai_message": response,
+                "timestamp": datetime.now().isoformat()
+            }, f, indent=2)
+    except:
+        pass
 
 
 async def async_main():
@@ -791,6 +841,7 @@ async def async_main():
     print("  memory on   - Include recent memory in prompts")
     print("  memory off  - Exclude recent memory from prompts")
     print("  model X     - Switch model (phi4, gemma4)")
+    print("  save        - Save current conversation to disk")
     print("  menu      - Show this commands menu")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
