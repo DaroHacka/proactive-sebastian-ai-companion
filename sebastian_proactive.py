@@ -244,7 +244,7 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
             user_name = get_user_name()
         except:
             user_name = "Daniel"
-        task_parts.append(f'{user_name}: {context_str}')
+        task_parts.append(f'After your wondering with your mind finally find the time to answer {user_name}\'s message: "{context_str}"')
     
     # Handle additional libraries (d, e, f, etc.)
     # Parse combo to find all library keys

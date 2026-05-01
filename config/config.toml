@@ -27,6 +27,7 @@ appointment_on_startup = true
 
 [user_input]
 # Chance of combo trigger when user sends a message (0.0 to 1.0)
+# To introduce unexpected, lively interactions into the conversation.
 # 0.20 = 20% chance per message
 combo_trigger_chance = 0.20
 
