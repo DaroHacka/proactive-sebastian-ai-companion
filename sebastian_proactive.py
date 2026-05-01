@@ -792,6 +792,7 @@ async def handle_command(cmd):
         print(f"\n[Combo triggered: {combo}]")
         prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
         response = await send_to_ollama(prompt)
+        print(f"\nSebastian: {response}")
     else:
         # Unknown command: send to AI as free text
         response = await send_to_ollama(cmd)
