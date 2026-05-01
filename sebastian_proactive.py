@@ -87,6 +87,7 @@ try:
     from config_manager import (
         get_user_name, 
         get_combo_trigger_chance, 
+        is_combo_on_user_message,
         get_ai_timeout,
         validate_schedule_percentages,
         validate_combo_weights,
@@ -96,6 +97,8 @@ except ImportError:
         return "Elias"
     def get_combo_trigger_chance():
         return 0.20
+    def is_combo_on_user_message():
+        return True
     def get_ai_timeout():
         return 600
     def validate_schedule_percentages(*args):
@@ -469,8 +472,10 @@ async def user_input_loop():
         except (EOFError, KeyboardInterrupt):
             break
         except Exception as e:
-            # Skip other input errors silently
-            pass
+            # Log error instead of silently ignoring
+            print(f"\n[ERROR processing message: {e}]")
+            import traceback
+            traceback.print_exc()
 
 
 async def handle_command(cmd):
