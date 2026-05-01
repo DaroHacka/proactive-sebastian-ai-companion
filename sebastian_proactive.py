@@ -119,7 +119,6 @@ from proactive_scheduler import (
 
 # ==================== LIBRARY MANAGER ====================
 from library_manager import (
-    generate_combo_weights,
     get_normal_libraries,
     get_special_libraries,
     get_loader,
@@ -834,10 +833,6 @@ async def async_main():
     _, sparse, norm_sched, warn_sched = validate_schedule_percentages()
     if warn_sched:
         logger.warning(f"CONFIG: {warn_sched}")
-    
-    _, norm_combo, warn_combo = validate_combo_weights()
-    if warn_combo:
-        logger.warning(f"CONFIG: {warn_combo}")
     
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
