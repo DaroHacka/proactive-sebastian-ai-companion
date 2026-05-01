@@ -51,14 +51,19 @@ explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention
 both_weight = 0.25              # 25%: both explicit + mood-based
 mood_only_weight = 0.25         # 25%: only mood-based (c4-weather-impulse.txt)
 
-[combo_weights]
-a_only = 0.20
-b_only = 0.10
-c_only = 0.15
-a_b = 0.15
-a_c = 0.20
-b_c = 0.10
-a_b_c = 0.10
+[combo_config]
+# Dial 1: How many libraries per combo? (must sum to 1.0)
+combo_size_weights = {1 = 0.50, 2 = 0.30, 3 = 0.20}
+
+# Dial 2: Library relevance weights (higher = more likely)
+# All libraries are treated equally - set value to control relevance
+[combo_config.library_relevance]
+a = 1.0    # intent
+b = 1.0    # cue
+c = 1.0    # vibe
+d = 1.0    # initiative (auto-discovered)
+e = 1.0    # books (auto-discovered)
+# Add more as auto-discovered: f, g, h, etc.
 
 [libraries]
   [libraries.a]

@@ -2,7 +2,6 @@
 Config Manager for Sebastian AI Companion
 Loads and manages configuration from config.toml.
 """
-
 import os
 import toml
 from pathlib import Path
@@ -12,10 +11,13 @@ DEFAULT_CONFIG = {
     "paths": {"library": "library", "appointments": "appointments", "memory": "memory", "config": "config"},
     "ollama": {"url": "http://localhost:11434", "model": "phi4", "available_models": ["phi4", "gemma4:26b"]},
     "system": {"proactive_mode": True, "appointment_mode": True, "memory_in_prompt": False, "test_mode": True},
-    "user_input": {"combo_trigger_chance": 0.20},
+    "user_input": {"combo_trigger_chance": 0.20, "combo_on_user_message": True},
     "timing": {"scheduler_interval_minutes": 10, "proactive_check_seconds": 30, "appointment_check_seconds": 30},
     "vibe": {"day_commentary_chance": 0.10, "weekend_longing_chance": 0.10},
-    "combo_weights": {"a_only": 0.20, "b_only": 0.10, "c_only": 0.15, "a_b": 0.15, "a_c": 0.20, "b_c": 0.10, "a_b_c": 0.10},
+    "combo_config": {
+        "combo_size_weights": {"1": 0.50, "2": 0.30, "3": 0.20},
+        "library_relevance": {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0}
+    },
 }
 
 _config = None
@@ -153,11 +155,95 @@ def get_timing(key: str) -> int:
 def get_vibe_chance(key: str) -> float:
     """Get a vibe probability."""
     return get_config().get("vibe", {}).get(key, 0.10)
+    
+
+def get_combo_size_weights() -> dict:
+    """Get K distribution (how many libraries per combo).
+    
+    Returns:
+        dict: {1: 0.50, 2: 0.30, 3: 0.20}
+    """
+    config = get_config()
+    weights = config.get("combo_config", {}).get("combo_size_weights", {})
+    # Default: equal chance for 1, 2, 3
+    return {
+        1: weights.get("1", 0.33),
+        2: weights.get("2", 0.33),
+        3: weights.get("3", 0.34)
+    }
 
 
-def get_combo_weight(combo: str) -> float:
-    """Get combo weight probability."""
-    return get_config().get("combo_weights", {}).get(combo, 0.10)
+def get_library_relevance_weights() -> dict:
+    """Get library relevance weights.
+    
+    Returns:
+        dict: {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, ...}
+    """
+    config = get_config()
+    return config.get("combo_config", {}).get("library_relevance", {})
+
+
+def select_combo_mathematical() -> str:
+    """Select combo using mathematical system.
+    
+    Returns:
+        str: Combo like "a_c" or "b_d_e"
+    """
+    import random
+    from library_manager import LIBRARIES
+    
+    # 1. Get K distribution and roll K
+    size_weights = get_combo_size_weights()
+    k = random.choices([1, 2, 3], weights=[size_weights[1], size_weights[2], size_weights[3]])[0]
+    
+    # 2. Get library relevance weights
+    lib_weights = get_library_relevance_weights()
+    
+    # 3. Determine active libraries (weight > 0, enabled in LIBRARIES)
+    active_libs = []
+    for lib_key, lib_info in LIBRARIES.items():
+        # Check if library is enabled
+        if not lib_info.get("enabled", True):
+            continue
+        # Check if weight > 0 in config (or use default 1.0)
+        weight = lib_weights.get(lib_key, 1.0)
+        if weight <= 0:
+            continue
+        active_libs.append((lib_key, weight))
+    
+    # 4. Compute N_active and K_effective
+    n_active = len(active_libs)
+    if n_active == 0:
+        return "a_only"  # Fallback
+    
+    k_effective = min(k, n_active)
+    
+    # 5. Sample K_effective libraries without replacement (weighted)
+    selected = []
+    remaining = active_libs.copy()
+    
+    for _ in range(k_effective):
+        if not remaining:
+            break
+        
+        libs, weights = zip(*remaining)
+        weights = [max(0.0, w) for w in weights]  # Ensure non-negative
+        
+        if sum(weights) == 0:
+            break
+        
+        # Weighted random choice
+        chosen_idx = random.choices(range(len(libs)), weights=weights)[0]
+        selected.append(libs[chosen_idx])
+        
+        # Remove chosen from remaining (sample without replacement)
+        remaining = [item for i, item in enumerate(remaining) if i != chosen_idx]
+    
+    # 6. Format combo string
+    if len(selected) == 1:
+        return selected[0] + "_only"
+    else:
+        return "_".join(sorted(selected))
 
 
 def validate_schedule_percentages(config: dict = None) -> tuple:
@@ -209,35 +295,6 @@ def get_schedule_config(key: str = None, default: any = None) -> any:
     if key:
         return cfg.get(key, default)
     return cfg
-
-
-def validate_combo_weights(config: dict = None) -> tuple:
-    """Validate combo weights sum to 1.0.
-    
-    Returns (weights_dict, was_normalized, warning_message)
-    """
-    if config is None:
-        config = get_config()
-    
-    weights = config.get("combo_weights", {})
-    
-    # Calculate sum
-    total = sum(weights.values())
-    
-    normalized = False
-    warning = None
-    
-    if abs(total - 1.0) > 0.001:
-        # Normalize weights
-        factor = 1.0 / total if total > 0 else 1.0
-        weights = {k: v * factor for k, v in weights.items()}
-        normalized = True
-        warning = (
-            f"Combo weights don't sum to 100% (got {total:.2f}). "
-            f"Normalized to sum to 1.0"
-        )
-    
-    return weights, normalized, warning
 
 
 def get_library_config(lib_key=None):

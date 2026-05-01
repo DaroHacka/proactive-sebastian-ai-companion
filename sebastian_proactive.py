@@ -90,7 +90,7 @@ try:
         is_combo_on_user_message,
         get_ai_timeout,
         validate_schedule_percentages,
-        validate_combo_weights,
+        select_combo_mathematical,
     )
 except ImportError:
     def get_user_name():
@@ -103,8 +103,8 @@ except ImportError:
         return 600
     def validate_schedule_percentages(*args):
         return 0.30, 0.70, False, None
-    def validate_combo_weights(*args):
-        return {}, False, None
+    def select_combo_mathematical():
+        return "a_c"
 from proactive_scheduler import (
     initialize_proactive_schedule,
     get_next_proactive_contact,
@@ -126,7 +126,7 @@ from library_manager import (
 )
 
 # Auto-generated from library_manager.LIBRARIES
-COMBINATION_WEIGHTS = generate_combo_weights()
+# COMBINATION_WEIGHTS no longer used - using mathematical system now
 
 SYSTEM_PROMPT = """You are Sebastian, an AI companion to Elias. Speak naturally, keep responses short."""
 
@@ -160,13 +160,8 @@ def load_prompt_template():
 
 
 def select_combination():
-    r = random.random()
-    cumulative = 0.0
-    for combo, weight in COMBINATION_WEIGHTS.items():
-        cumulative += weight
-        if r < cumulative:
-            return combo
-    return "a_c"
+    """Select combo using mathematical system."""
+    return select_combo_mathematical()
 
 
 def save_prompt_to_log(prompt, source):
@@ -573,22 +568,30 @@ async def handle_command(cmd):
         print("\n[Triggering...]")
         hour = datetime.now().hour
         
-        # Get combo and components for display
+        # Get combo using mathematical system
         combo = select_combination()
-        intent = get_random_intent() if "a" in combo else None
-        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
-        vibe = get_random_vibe(hour) if "c" in combo else None
         
-        # Show what was picked
+        # Show what was picked (display all components)
         print(f"Combination: {combo}")
         print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
-        if intent:
+        
+        # Show components based on combo keys
+        combo_keys = combo.replace("_only", "").split("_")
+        if "a" in combo_keys:
+            intent = get_random_intent()
             print(f" Intent: {intent[:60]}...")
-        if cue_code:
+        if "b" in combo_keys:
+            cue_code, cue_desc, _ = get_random_cue()
             print(f" Cue: {cue_code}")
-        if vibe:
+        if "c" in combo_keys:
+            vibe = get_random_vibe(hour)
             library = "day" if hour >= 6 else "night"
             print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+        
+        # Show additional libraries
+        for key in combo_keys:
+            if key not in ["a", "b", "c"]:
+                print(f" Library {key}: [auto-discovered]")
         
         # Build context and prompt - pass combo to ensure same combo used
         context = "Activity: manual trigger"
@@ -611,8 +614,8 @@ async def handle_command(cmd):
         # Parse: trigger vibe [combo] [mode]
         if len(parts) < 3:
             print("[Usage: trigger vibe <combo> <mode>]")
-            print("  combo: a_only, b_only, a_b, a_c, b_c, a_b_c, f_g_c, etc.")
-            print("  mode: 1=vibe only, 2=+weekdays, 3=+longing")
+            print("  combo: a_only, b_only, a_b, a_c, b_c, a_b_c, or any combo like d_e, a_c_d, etc.")
+            print("  mode: 1=vibe only, 2=+weekdays, 3=+longing, 4=+weather")
             return
         
         combo_arg = parts[2]
@@ -622,33 +625,33 @@ async def handle_command(cmd):
             print("[Mode must be 1, 2, 3, or 4]")
             return
         
-        # Convert single letter to _only format
-        if "_" not in combo_arg and len(combo_arg) == 1:
-            combo = combo_arg + "_only"
-        else:
-            combo = combo_arg
-        
-        print(f"\n[Triggering combo {combo} with vibe mode {mode}...]")
+        print(f"\n[Triggering combo {combo_arg} with vibe mode {mode}...]")
         hour = datetime.now().hour
         
         # Show what was picked
-        print(f"Combination: {combo}")
+        print(f"Combination: {combo_arg}")
         print(f" Mode: {mode}")
         print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
         
         # Dynamically load components based on combo
-        intent = get_random_intent() if "a" in combo else None
-        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+        combo_keys = combo_arg.replace("_only", "").split("_")
         
-        if intent:
+        if "a" in combo_keys:
+            intent = get_random_intent()
             print(f" Intent: {intent[:60]}...")
-        if cue_code:
+        if "b" in combo_keys:
+            cue_code, cue_desc, _ = get_random_cue()
             print(f" Cue: {cue_code}")
         
         # Build and show vibe (if c in combo)
-        if "c" in combo:
+        if "c" in combo_keys:
             vibe_text = build_vibe_prompt(hour, mode)
             print(f" Vibe: {vibe_text[:100]}...")
+        
+        # Show additional libraries
+        for key in combo_keys:
+            if key not in ["a", "b", "c"]:
+                print(f" Library {key}: [auto-discovered]")
         
         # Build context and prompt
         context = "Activity: manual trigger"
@@ -657,7 +660,7 @@ async def handle_command(cmd):
             if recent:
                 context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
         
-        prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo, mode=mode)
+        prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo_arg, mode=mode)
         save_prompt_to_log(prompt, f"trigger_vibe_{mode}")
         
         response = await send_to_ollama(prompt)
