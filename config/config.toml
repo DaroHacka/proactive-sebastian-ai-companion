@@ -37,11 +37,7 @@ day_commentary_chance = 0.10
 weekend_longing_chance = 0.10
 
 [weather]
-location = "Paris"  # User's location for wttr.in
-# c4 distribution weights (must sum to 1.0)
-explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention.txt)
-both_weight = 0.25              # 25%: both explicit + mood-based
-mood_only_weight = 0.25         # 25%: only mood-based (c4-weather-impulse.txt)
+location = "San_Gregorio_nelle_Alpi"  # User's location for wttr.in
 # c4 distribution weights (must sum to 1.0)
 explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention.txt)
 both_weight = 0.25              # 25%: both explicit + mood-based
@@ -78,3 +74,4 @@ contacts_sparse_max = 4
 contacts_active_min = 5
 contacts_active_max = 15
 active_day_percentage = 0.30
+frequency = 3  # 1-10 scale (3 = light schedule, 5 = balanced, 10 = maximum)

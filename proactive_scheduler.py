@@ -584,24 +584,50 @@ def is_special_date(day_date):
 def generate_daily_contacts(day_date):
     """Generate number of contacts for a day.
     
-    Distribution:
-    - 70% of days: 2-4 contacts (sparse)
-    - 30% of days: 5-15 contacts (active)
+    Uses frequency parameter from config (1-10 scale):
+    - frequency=1: minimal (1 contact/day)
+    - frequency=3: light (default)
+    - frequency=5: balanced (current default)
+    - frequency=10: maximum (up to 24 contacts/day)
     """
+    # Load frequency from config
+    try:
+        import toml
+        with open("config/config.toml") as f:
+            config = toml.load(f)
+            frequency = config.get("schedule", {}).get("frequency", 3)
+    except:
+        frequency = 3  # Default: light schedule
+    
     # Check for special date
     special = is_special_date(day_date)
     
     if special:
-        # Special date - use extra_contacts
-        return special.get("extra_contacts", 5), special.get("activity", "HOLIDAY")
+        # Special date - scale extra_contacts by frequency
+        base = special.get("extra_contacts", 5)
+        scaled = int(base * (frequency / 5.0))
+        return max(1, scaled), special.get("activity", "HOLIDAY")
+    
+    # Calculate based on frequency (1-10 scale)
+    # Linear interpolation: t = 0 (freq=1) to 1 (freq=10)
+    t = (frequency - 1) / 9.0
+    
+    # Sparse day contacts (always at least 1)
+    sparse_min = max(1, int(1 + t * 3))   # 1-4
+    sparse_max = max(sparse_min, int(1 + t * 7))  # 1-8
+    
+    # Active day contacts
+    active_min = max(1, int(1 + t * 19))  # 1-20
+    active_max = max(active_min, int(1 + t * 23))  # 1-24
+    
+    # Active day percentage increases with frequency
+    active_pct = 0.10 + t * 0.80  # 10%-90%
     
     # Random day
-    if random.random() < 0.30:
-        # 30% - active day (5-15 contacts)
-        return random.randint(5, 15), None
+    if random.random() < active_pct:
+        return random.randint(active_min, active_max), None
     else:
-        # 70% - sparse day (2-4 contacts)
-        return random.randint(2, 4), None
+        return random.randint(sparse_min, sparse_max), None
 
 
 def generate_monthly_schedule(year, month):
@@ -630,9 +656,10 @@ def generate_monthly_schedule(year, month):
             
             # Generate contact times distributed throughout the day
             # Only generate if the day is today or future
-            if num_contacts > 0:
+            if num_contacts >0:
                 # First contact time - if today, start from current hour + buffer
                 if current_day == today:
+                    now = datetime.now()
                     current_hour = now.hour + 1
                     if current_hour < 9:
                         current_hour = 9
@@ -740,19 +767,39 @@ def initialize_proactive_schedule():
     """Initialize new monthly schedule if needed."""
     now = datetime.now()
     
+    # Load current frequency from config
+    try:
+        import toml
+        with open("config/config.toml") as f:
+            config = toml.load(f)
+            current_freq = config.get("schedule", {}).get("frequency", 3)
+    except:
+        current_freq = 3
+    
     # Check if we need new schedule
     existing = load_proactive_schedule()
     
     if existing:
         # Check if current month
         current_month = f"{now.year}-{now.month:02d}"
-        if existing.get("month") == current_month:
-            logger.info(f"Proactive schedule for {current_month} already exists")
+        existing_month = existing.get("month")
+        existing_freq = existing.get("config", {}).get("frequency", 3)
+        
+        # If same month AND same frequency, reuse existing
+        if existing_month == current_month and existing_freq == current_freq:
+            logger.info(f"Proactive schedule for {current_month} (freq={current_freq}) already exists")
             return existing
+        elif existing_freq != current_freq:
+            logger.info(f"Frequency changed: {existing_freq} -> {current_freq}, regenerating...")
+        elif existing_month != current_month:
+            logger.info(f"Month changed: {existing_month} -> {current_month}, regenerating...")
     
     # Generate new schedule
-    logger.info(f"Generating new proactive schedule for {now.year}-{now.month:02d}")
+    logger.info(f"Generating new proactive schedule for {now.year}-{now.month:02d} (freq={current_freq})")
     new_schedule = generate_monthly_schedule(now.year, now.month)
+    
+    # Save frequency in schedule for future comparison
+    new_schedule["config"] = {"frequency": current_freq}
     save_proactive_schedule(new_schedule)
     
     return new_schedule
