@@ -87,8 +87,22 @@ def get_available_models() -> list:
 
 
 def get_combo_trigger_chance() -> float:
-    """Get combo trigger chance for user input."""
-    return get_config().get("user_input", {}).get("combo_trigger_chance", 0.20)
+    """Get combo trigger chance for user input.
+    
+    Returns:
+        float: Probability between 0.0 (never) and 1.0 (always)
+    """
+    chance = get_config().get("user_input", {}).get("combo_trigger_chance", 0.20)
+    return max(0.0, min(1.0, chance))  # Clamp to [0.0, 1.0]
+
+
+def is_combo_on_user_message() -> bool:
+    """Check if combo should trigger on user messages.
+    
+    Returns:
+        bool: True if combo can trigger on user input, False otherwise
+    """
+    return get_config().get("user_input", {}).get("combo_on_user_message", True)
 
 
 def is_proactive_mode() -> bool:

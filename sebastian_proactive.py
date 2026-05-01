@@ -236,6 +236,16 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     if "c" in combo:
         task_parts.append(f'In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}"')
     
+    # Always include user message for user_input mode
+    if mode == "user_input" and context_str:
+        # Get user name from config
+        try:
+            from config.config_manager import get_user_name
+            user_name = get_user_name()
+        except:
+            user_name = "Daniel"
+        task_parts.append(f'{user_name}: {context_str}')
+    
     # Handle additional libraries (d, e, f, etc.)
     # Parse combo to find all library keys
     combo_keys = combo.replace("_only", "").split("_")
@@ -787,7 +797,7 @@ async def handle_command(cmd):
         return
     
     # Combo trigger chance on normal user message
-    if random.random() < get_combo_trigger_chance():
+    if is_combo_on_user_message() and random.random() < get_combo_trigger_chance():
         combo = select_combination()
         print(f"\n[Combo triggered: {combo}]")
         prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
