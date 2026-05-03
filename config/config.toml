@@ -37,8 +37,8 @@ combo_on_user_message = true
 
 [timing]
 scheduler_interval_minutes = 10
-proactive_check_seconds = 30
-appointment_check_seconds = 30
+proactive_check_seconds = 60  # Changed from 30 for power efficiency
+appointment_check_seconds = 60  # Changed from 30 for power efficiency
 
 [vibe]
 day_commentary_chance = 0.10

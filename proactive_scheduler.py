@@ -1312,6 +1312,79 @@ def get_explicit_weather_mention(weather_code=None):
     return None
 
 
+def get_next_future_proactive_contact():
+    """Get the next FUTURE pending proactive contact.
+    
+    Returns:
+        (contact_dict, seconds_until_due) or (None, None)
+    """
+    schedule = load_proactive_schedule()
+    
+    if not schedule:
+        return None, None
+    
+    now = datetime.now()
+    earliest = None
+    earliest_contact = None
+    
+    for contact in schedule.get("schedule", []):
+        if contact.get("status") != "pending":
+            continue
+        
+        due = datetime.fromisoformat(contact["due"])
+        
+        # Only future contacts
+        if due > now:
+            if earliest is None or due < earliest:
+                earliest = due
+                earliest_contact = contact
+    
+    if earliest is None:
+        return None, None
+    
+    seconds_until = (earliest - now).total_seconds()
+    return earliest_contact, max(0, seconds_until)
+
+
+def get_next_appointment_info():
+    """Get next future appointment and seconds until due.
+    
+    Returns:
+        (appointment_dict, seconds_until_due) or (None, None)
+    """
+    import json
+    try:
+        with open("appointments/appointments.json", "r") as f:
+            appointments = json.load(f)
+    except:
+        return None, None
+    
+    if not appointments:
+        return None, None
+    
+    now = datetime.now()
+    earliest = None
+    earliest_appt = None
+    
+    for appt in appointments.get("appointments", []):
+        if appt.get("status") != "pending":
+            continue
+        
+        due = datetime.fromisoformat(appt["due"])
+        
+        # Only future appointments
+        if due > now:
+            if earliest is None or due < earliest:
+                earliest = due
+                earliest_appt = appt
+    
+    if earliest is None:
+        return None, None
+    
+    seconds_until = (earliest - now).total_seconds()
+    return earliest_appt, max(0, seconds_until)
+
+
 def log_weather_type(weather_code, weather_type, explicit_text=None, mood_text=None):
     """Log which weather type was selected to weather_logs/.
     

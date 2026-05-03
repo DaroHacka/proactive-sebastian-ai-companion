@@ -327,7 +327,7 @@ async def send_to_ollama(prompt):
 # ==================== ASYNCIO MONITORS ====================
 
 async def proactive_monitor():
-    """Monitors proactive schedule - Sebastian's heartbeat."""
+    """Monitors proactive schedule - Sebastian's heartbeat (dynamic interval)."""
     first_run = True
     while True:
         if first_run:
@@ -335,11 +335,31 @@ async def proactive_monitor():
             first_run = False
             continue
         
-        # Check PROACTIVE_MODE at RUNTIME, not import time
+        # Check PROACTIVE_MODE at RUNTIME
         if PROACTIVE_MODE:
             await check_proactive()
         
-        await asyncio.sleep(30)  # Check every 30 seconds
+        # Dynamic sleep: calculate time until next FUTURE contact
+        try:
+            from proactive_scheduler import get_next_future_proactive_contact
+            next_contact, seconds_until = get_next_future_proactive_contact()
+        except:
+            next_contact, seconds_until = None, None
+        
+        if next_contact is None:
+            # No pending contacts - sleep for 5 minutes (300s)
+            logger.info("No pending proactive contacts - sleeping 5 minutes")
+            await asyncio.sleep(300)
+            continue
+        
+        if seconds_until > 60:
+            # Contact is >1 minute away - sleep until 60s before it
+            sleep_time = min(seconds_until - 60, 300)  # Cap at 5 minutes
+            logger.info(f"Next proactive contact in {seconds_until:.0f}s - sleeping {sleep_time:.0f}s")
+            await asyncio.sleep(sleep_time)
+        else:
+            # Contact is due soon (within 60s) - check frequently
+            await asyncio.sleep(10)
 
 
 async def check_proactive():
@@ -423,16 +443,38 @@ def complete_appointment(appt_id):
 
 
 async def appointment_check_loop():
-    """Monitors appointments.json for due appointments."""
+    """Monitors appointments.json for due appointments - smart scheduler."""
     while True:
-        await asyncio.sleep(30)
+        # Get next appointment timing
+        try:
+            from proactive_scheduler import get_next_appointment_info
+            next_appt, seconds_until = get_next_appointment_info()
+        except:
+            next_appt, seconds_until = None, None
         
         # Check APPOINTMENT_MODE at runtime
         if os.getenv('APPOINTMENT_MODE', 'true').lower() != 'true':
+            await asyncio.sleep(60)  # Still check mode periodically
             continue
         
-        # Check for due appointments
-        appts = get_due_appointments()
+        # Dynamic sleep based on next appointment
+        if next_appt is None:
+            # No appointments - sleep for 5 minutes (300s)
+            logger.info("No pending appointments - sleeping 5 minutes")
+            await asyncio.sleep(300)
+            continue
+        
+        if seconds_until > 60:
+            # Appointment is >1 minute away - sleep until 60s before it
+            sleep_time = min(seconds_until - 60, 300)  # Cap at 5 minutes
+            logger.info(f"Next appointment in {seconds_until:.0f}s - sleeping {sleep_time:.0f}s")
+            await asyncio.sleep(sleep_time)
+        else:
+            # Appointment is due soon (within 60s) - check frequently
+            await asyncio.sleep(10)
+        
+        # Now check for due appointments
+        appts = get_due_appointments()  # Get actual due appointments
         
         for appt in appts:
             print(f"\n[Appointment: {appt.get('description', appt.get('activity', 'check-in'))[:50]}...]")
