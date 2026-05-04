@@ -16,7 +16,12 @@ DEFAULT_CONFIG = {
     "vibe": {"day_commentary_chance": 0.10, "weekend_longing_chance": 0.10},
     "combo_config": {
         "combo_size_weights": {"1": 0.50, "2": 0.30, "3": 0.20},
-        "library_relevance": {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0}
+        "library_relevance": {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0, "f": 0.0}
+    },
+    "libraries": {
+        "a": {"weight_bias": 1.0, "max_combo": 3, "enabled": True},
+        "b": {"weight_bias": 1.0, "max_combo": 3, "enabled": True},
+        "c": {"weight_bias": 2.0, "max_combo": 3, "enabled": True},
     },
 }
 

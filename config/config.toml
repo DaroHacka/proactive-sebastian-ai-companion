@@ -52,7 +52,7 @@ mood_only_weight = 0.25         # 25%: only mood-based (c4-weather-impulse.txt)
 
 [combo_config]
 # Dial 1: How many libraries per combo? (must sum to 1.0)
-combo_size_weights = {1 = 0.50, 2 = 0.30, 3 = 0.20}
+combo_size_weights = {1 = 0.20, 2 = 0.50, 3 = 0.30}
 
 # Dial 2: Library relevance weights (higher = more likely)
 # All libraries are treated equally - set value to control relevance

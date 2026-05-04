@@ -5,8 +5,10 @@ A proactive AI companion powered by local LLMs (phi4 via Ollama) that reaches ou
 ## Features
 
 - **Proactive Contact**: Sebastian initiates conversations based on scheduled intervals or appointments
+- **Appointment System**: Schedule check-ins using natural language ("check in at 3pm", "remind me tomorrow at 9am")
+- **Appointment-Triggered Openers**: Dedicated library (`appointment-triggered-openers.txt`) for appointment-only responses
 - **Memory System**: Fresh, medium, and long-term memory storage with automatic archival
-- **Time-aware Scheduling**: Understands natural time expressions (\"tonight\", \"later\", \"morning\", etc.)
+- **Time-aware Scheduling**: Understands natural time expressions ("tonight", "later", "morning", etc.)
 - **Auto-pause**: Pauses automatic scheduling when appointments are set, resumes when they fire
 - **TUI Interface**: Terminal-based UI with urwid (sebastian_urwid.py)
 - **Cue System**: Response variation with character/personality injection
@@ -36,17 +38,13 @@ Required settings in `.env`:
 ```env
 OLLAMA_URL=http://localhost:11434
 COMPANION_MODEL=phi4
-SCHEDULER_INTERVAL_MINUTES=5
-AUTOMATIC_ENABLED=true
-
-# Cue System (response variation)
-CUE_ENABLED=true
-CUE_PROBABILITY=0.2  # 20% chance
 
 # Memory Management
 MAX_MEMORY_ENTRIES=50  # Max per memory tier
 ARCHIVE_THRESHOLD=30   # Days before archival
 ```
+
+**Note**: The old `SCHEDULER_INTERVAL_MINUTES` setting is no longer used. Sebastian now uses dynamic sleep scheduling based on the next due contact.
 
 ### 3. Run
 
@@ -75,7 +73,6 @@ Logs are saved to `logs/sebastian.log` automatically.
 | `resume proactive` | Resume proactive schedule only |
 | `resume appointment` | Resume appointment check only |
 | `model X` | Switch model (phi4, gemma4) |
-| `interval X` | Set check interval to X minutes |
 | `status` | Show status (proactive, appointment, auto, schedule) |
 | `clear-schedule` | Clear all appointments |
 | `clear-all` | Clear all data |
@@ -86,6 +83,54 @@ Logs are saved to `logs/sebastian.log` automatically.
 | `menu` | Show commands menu |
 | `clear` | Clear screen |
 | `quit` | Exit |
+
+### Appointment System
+
+Sebastian can schedule appointments that trigger at specific times using natural language:
+
+#### Creating Appointments
+
+Ask Sebastian to check in later:
+```
+You: Check in with me tomorrow at 9am
+Sebastian: I'll check in with you tomorrow at 9:00 AM. See you then!
+
+You: Remind me at 3pm to take a break
+Sebastian: I'll remind you at 3:00 PM today.
+```
+
+#### Appointment Features
+
+- **Persistent Storage**: Appointments saved to `appointments/appointments.json`
+- **One-Time Trigger**: Each appointment triggers exactly ONCE, then marked as "completed"
+- **Dedicated Openers**: Uses `library/appointment-triggered-openers.txt` (NOT combo system)
+- **Automatic Parsing**: Time expressions parsed via `time_parser.py`
+- **Source Tracking**: Appointments tagged by source (user_request, ai_proposal, library_f)
+
+#### Appointment Files
+
+| File | Purpose |
+|------|---------|
+| `appointments/appointments.json` | Active appointments storage |
+| `library/appointment-triggered-openers.txt` | 40+ human-like openers with relative time phrases |
+
+#### Checking Appointments
+
+```bash
+# View pending appointments via status command
+> status
+[Pending appointments: 2]
+
+# Or check JSON directly
+cat appointments/appointments.json
+```
+
+#### Appointment Flow
+
+1. **Creation**: User asks Sebastian to check in later → parsed and saved to `appointments.json`
+2. **Monitoring**: `proactive_monitor()` checks both `proactive_schedule.json` AND `appointments.json`
+3. **Trigger**: When due time arrives, Sebastian uses `appointment-triggered-openers.txt` (no combo)
+4. **Completion**: After triggering, appointment status changes to "completed" (prevents re-triggering)
 
 ### Trigger Vibe Modes
 
@@ -400,6 +445,7 @@ AI-v2/
 ├── scheduler.py                  # Appointment scheduler
 ├── proactive_scheduler.py        # Monthly schedule generator + weather integration
 ├── time_parser.py                # Time parsing
+├── commitment_parser.py          # Appointment creation from AI responses
 ├── intent_manager.py             # Intent handling
 ├── cue_manager.py               # Cue system
 ├── library_manager.py            # Dynamic library loader
@@ -418,11 +464,13 @@ AI-v2/
 │   ├── weekend_longing_interaction.txt # Weekend longing (component c3)
 │   ├── c4-weather_impulse.txt   # Weather mood-based impulses (component c4)
 │   ├── c4_explicit_mention.txt  # Weather explicit mentions (component c4)
+│   ├── appointment-triggered-openers.txt  # Dedicated openers for appointments ONLY
 │   ├── library-X-*.txt          # Custom auto-discovered libraries
 │   ├── SAMPLE-new_library.txt   # Sample format template
 │   └── manage_library_guide.txt # Library customization guide
 ├── appointments/
-│   └── *.json                   # Appointment schedule files
+│   ├── appointments.json        # Active appointments (user requests + AI proposals)
+│   └── proactive_schedule.json  # Auto-generated monthly schedule
 ├── weather_logs/                 # Weather data logs (JSON + parsed + type)
 ├── prompt-to-AI-logs/           # AI prompt logs for cross-checking
 ├── .env.example                  # Config template
@@ -462,7 +510,6 @@ grep ERROR logs/sebastian.log
 [app]
 proactive_mode = true          # Enable proactive contacting
 appointment_mode = true       # Enable appointment checking
-interval_seconds = 30         # Check interval (seconds)
 combo_trigger_probability = 0.2  # 20% chance on user messages
 
 [user]
@@ -480,6 +527,8 @@ fresh_max = 10
 medium_max = 50
 archive_threshold_days = 30
 ```
+
+**Note**: The old `SCHEDULER_INTERVAL_MINUTES` and `interval_seconds` settings are no longer used. Sebastian now uses dynamic sleep based on the next scheduled contact.
 
 ### config/ollama_params.toml
 

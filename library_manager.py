@@ -39,6 +39,16 @@ LIBRARIES = {
         "auto_discovered": False,
     },
     # "d": {...},  # Future: auto-discovered
+    "f": {
+        "name": "appointment_proposal",
+        "file": [],  # Will be filled by auto-discovery
+        "loader_module": "sebastian_proactive",
+        "loader_func": "get_random_appointment_proposal",
+        "weight_bias": 0.0,  # Disabled by default (user sets 0.1 in config)
+        "max_combo": 3,
+        "enabled": False,
+        "auto_discovered": False,  # We're manually registering it
+    },
 }
 
 
@@ -51,8 +61,19 @@ def discover_new_libraries(library_dir="library"):
     """
     discovered = {}
     
+    # Fix: use absolute path relative to this file
+    if not os.path.isabs(library_dir):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        library_dir = os.path.join(base_dir, library_dir)
+    
+    print(f"[DEBUG] library_dir: {library_dir}")
+    print(f"[DEBUG] Absolute path: {os.path.abspath(library_dir)}")
+    print(f"[DEBUG] Exists: {os.path.exists(library_dir)}")
+    
     if not os.path.exists(library_dir):
         return discovered
+    
+    print(f"[DEBUG] Files in dir: {sorted(os.listdir(library_dir))}")
     
     pattern = r"library-([a-z])-(.+)\.txt$"
     
@@ -63,6 +84,8 @@ def discover_new_libraries(library_dir="library"):
             name = match.group(2)     # "books"
             full_path = os.path.join(library_dir, fname)
             
+            print(f"[DEBUG] Matched: {fname} -> letter={letter}, name={name}")
+            
             if letter not in discovered:
                 discovered[letter] = {
                     "files": [],
@@ -72,6 +95,7 @@ def discover_new_libraries(library_dir="library"):
                 }
             discovered[letter]["files"].append(full_path)
     
+    print(f"[DEBUG] Discovered libraries: {list(discovered.keys())}")
     return discovered
 
 
@@ -101,24 +125,53 @@ def update_libraries_from_discovery():
     # First, remove deleted
     remove_deleted_libraries()
     
-    # Then, add new
+    # Load config for auto-discovered libraries
+    try:
+        from config.config_manager import get_config
+        config = get_config()
+        combo_relevance = config.get("combo_config", {}).get("library_relevance", {})
+        lib_configs = config.get("libraries", {})
+    except:
+        combo_relevance = {}
+        lib_configs = {}
+    
+    # Then, add new OR update existing
     discovered = discover_new_libraries()
     
     for letter, info in discovered.items():
         if letter in LIBRARIES:
-            continue  # Already exists
+            # Already exists - update file paths from auto-discovery
+            if info.get("files"):
+                LIBRARIES[letter]["file"] = info["files"]
+                print(f"[Updated library {letter} with discovered files]")
+            
+            # Update with config values if available
+            if letter in lib_configs:
+                lib_config = lib_configs[letter]
+                if "weight_bias" in lib_config:
+                    LIBRARIES[letter]["weight_bias"] = lib_config["weight_bias"]
+                if "enabled" in lib_config:
+                    LIBRARIES[letter]["enabled"] = lib_config["enabled"]
+                print(f"[Updated library {letter} from config: weight={LIBRARIES[letter]['weight_bias']}, enabled={LIBRARIES[letter]['enabled']}]")
+            continue
         
-        # Add with default loader (simple line reader)
+        # New library - add with config-based values
+        weight = combo_relevance.get(letter, 1.0)
+        lib_config = lib_configs.get(letter, {})
+        weight = lib_config.get("weight_bias", weight)
+        enabled = lib_config.get("enabled", weight > 0)
+        
         LIBRARIES[letter] = {
             "name": info["name"],
             "file": info["files"],
             "loader_module": None,
             "loader_func": None,
-            "weight_bias": 1.0,
+            "weight_bias": weight,
             "max_combo": 3,
-            "enabled": True,
+            "enabled": enabled,
             "auto_discovered": True,
         }
+        print(f"[Auto-discovered library {letter}: weight={weight}, enabled={enabled}]")
 
 
 def default_loader(file_paths):
@@ -177,18 +230,22 @@ def get_loader(lib_key):
     if not lib or not lib.get("enabled", True):
         return None
     
-    # Auto-discovered library: use default loader
+    # FIRST: Check if custom loader is defined (even for auto-discovered)
+    if lib.get("loader_module") and lib.get("loader_func"):
+        try:
+            module = importlib.import_module(lib["loader_module"])
+            return getattr(module, lib["loader_func"], None)
+        except Exception as e:
+            print(f"[Loader error for {lib_key}: {e}]")
+            # Fall through to default loader if available
+    
+    # Auto-discovered library with no custom loader: use default loader
     if lib.get("auto_discovered"):
         files = lib.get("file", [])
         return lambda: default_loader(files)
     
-    # Hardcoded library: import function
-    try:
-        module = importlib.import_module(lib["loader_module"])
-        return getattr(module, lib["loader_func"], None)
-    except Exception as e:
-        print(f"[Loader error for {lib_key}: {e}]")
-        return None
+    # No loader found
+    return None
 
 
 def add_library(key, name, file, loader_module, loader_func, 

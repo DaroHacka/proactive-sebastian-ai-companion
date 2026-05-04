@@ -121,6 +121,18 @@ def parse_response_for_time(response: str) -> datetime | None:
     text_lower = response.lower()
     now = datetime.now()
 
+    # Try relative expressions like "in X minutes/hours"
+    # Pattern: "in 30 minutes", "in 2 hours", "in 45 mins"
+    relative_pattern = re.search(r"in\s+(\d+)\s*(minutes?|hours?|mins?|hrs?)", text_lower)
+    if relative_pattern:
+        amount = int(relative_pattern.group(1))
+        unit = relative_pattern.group(2)
+        
+        if unit.startswith("hour") or unit.startswith("hr"):
+            return now + timedelta(hours=amount)
+        else:  # minutes
+            return now + timedelta(minutes=amount)
+    
     # Try explicit time patterns first (more specific)
     # Pattern 1: "8 PM", "9pm", "8pm", "9 PM"
     explicit_pattern = re.search(r"(\d{1,2})\s*(am|pm|AM|PM)", text_lower)
