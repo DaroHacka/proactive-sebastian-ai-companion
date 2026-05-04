@@ -414,8 +414,8 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     # If appointment_mode, skip combo entirely
     if appointment_mode:
         combo = None
-    elif combo is None:
-        combo = select_combination()
+    # NOTE: If combo is None, don't auto-select - caller decides
+    # This allows normal user messages to have NO combo components
     
     # Load template
     template = load_prompt_template()
