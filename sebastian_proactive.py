@@ -1427,14 +1427,7 @@ async def user_input_loop():
             pass
         
         continue
-        combo = select_combination()
-        print(f"\n[Combo triggered: {combo}]")
-        prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
-        response = await send_to_ollama(prompt)
-        print(f"\nSebastian: {response}")
-        await parse_and_schedule(response, cmd)
-        continue
-        # Unknown command: send to AI as free text
+        # ===== COMBO TRIGGER ON USER MESSAGES =====
         # Only trigger combo based on config chance
         if is_combo_on_user_message() and random.random() < get_combo_trigger_chance():
             combo = select_combination()
@@ -1475,7 +1468,6 @@ async def user_input_loop():
                 "ai_message": response,
                 "timestamp": datetime.now().isoformat()
             }, f, indent=2)
-        pass
 
 
 
