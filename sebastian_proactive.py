@@ -129,6 +129,7 @@ from library_manager import (
     get_normal_libraries,
     get_special_libraries,
     get_loader,
+    LIBRARIES,
 )
 
 # Auto-generated from library_manager.LIBRARIES
@@ -847,21 +848,21 @@ async def user_input_loop():
             
             # ===== LIBRARY INFO =====
             if cmd.startswith("library "):
-                    letter = cmd.split()[1].lower()
-                    if letter in LIBRARIES:
-                        lib = LIBRARIES[letter]
-                        print(f"\n[Library {letter.upper()}: {lib['name']}]")
-                        samples = []
-                        for f in lib.get("files", []):
-                            if os.path.exists(f):
-                                with open(f) as fp:
-                                    lines = fp.readlines()
-                                    samples.extend(lines[:3])
-                        for s in samples[:5]:
-                            print(f"  {s.strip()}")
-                    else:
-                        print(f"[Unknown library: {letter}]")
-                    continue
+                letter = cmd.split()[1].lower()
+                if letter in LIBRARIES:
+                    lib = LIBRARIES[letter]
+                    print(f"\n[Library {letter.upper()}: {lib['name']}]")
+                    samples = []
+                    for f in lib.get("files", []):
+                        if os.path.exists(f):
+                            with open(f) as fp:
+                                lines = fp.readlines()
+                                samples.extend(lines[:3])
+                    for s in samples[:5]:
+                        print(f"  {s.strip()}")
+                else:
+                    print(f"[Unknown library: {letter}]")
+                continue
             
             # ===== RESET PARAMETERS =====
             if cmd == "reset parameters":
