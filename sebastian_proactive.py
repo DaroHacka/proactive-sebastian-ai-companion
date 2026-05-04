@@ -42,15 +42,23 @@ LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "sebastian.log")),
-        logging.StreamHandler()
-    ]
-)
+# Create handlers with different levels
+_file_handler = logging.FileHandler(os.path.join(LOG_DIR, "sebastian.log"))
+_file_handler.setLevel(logging.DEBUG)  # Keep ALL messages in file
+
+_stream_handler = logging.StreamHandler()
+_stream_handler.setLevel(logging.WARNING)  # Only WARNING+ on screen
+
+_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+_file_handler.setFormatter(_formatter)
+_stream_handler.setFormatter(_formatter)
+
+# Get logger and add handlers
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(_file_handler)
+logger.addHandler(_stream_handler)
+logger.propagate = False  # Prevent duplicate messages
 
 # ==================== CONFIG ====================
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -65,7 +73,6 @@ if not os.path.exists(CONVERSATION_DIR):
 APPOINTMENTS_FILE = "appointments/appointments.json"
 MAX_MEMORY_ENTRIES = int(os.getenv("MAX_MEMORY_ENTRIES", "50"))
 ARCHIVE_THRESHOLD = int(os.getenv("ARCHIVE_THRESHOLD", "30"))
-_global_interval = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "10"))
 
 # Schedule scheduler to import after load_dotenv
 import scheduler as sched_module
@@ -156,6 +163,224 @@ def load_prompt_template():
         _template_cache[key] = _template_cache[key].replace("{USER_NAME}", user_name)
     
     return _template_cache
+    
+
+def get_relative_time_phrase(seconds):
+    """Convert seconds to relative time phrase from appointment-triggered-openers.txt.
+    
+    Uses the [Relative-Time Phrase Library] section.
+    Returns phrase like "earlier today", "yesterday", "a couple of days ago", etc.
+    """
+    try:
+        with open("library/appointment-triggered-openers.txt", "r") as f:
+            content = f.read()
+        
+        # Find [Relative-Time Phrase Library] section
+        marker = "[Relative-Time Phrase Library]"
+        if marker not in content:
+            return "when we talked"  # Fallback
+        
+        section = content.split(marker)[1].split("###")[0]
+        
+        # Parse categories (format: "1. Minutes Ago (0-59 min) | phrase1 | phrase2 | ...")
+        current_range = None
+        for line in section.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            
+            # Check if this is a category definition (starts with number)
+            if line[0].isdigit() and ". " in line:
+                # Parse time range
+                category_line = line.split("|")[0].strip()
+                # Extract range like "0-59 min"
+                import re
+                range_match = re.search(r'(\d+)\s*-\s*(\d+)\s*min', category_line)
+                if range_match:
+                    min_sec = int(range_match.group(1)) * 60
+                    max_sec = int(range_match.group(2)) * 60
+                    if min_sec <= seconds < max_sec:
+                        # Found our category - extract phrases
+                        phrases_part = line.split("|", 1)[1] if "|" in line else ""
+                        phrases = [p.strip().strip('"') for p in phrases_part.split("|")]
+                        import random
+                        return random.choice([p for p in phrases if p])
+            elif line and line[0] not in "0123456789" and line not in ["|", "-", " "]:
+                # This might be a phrase line for current category
+                pass
+        
+        return "when we talked"  # Fallback
+    except Exception as e:
+        logger.error(f"Error reading appointment-triggered-openers.txt: {e}")
+        return "when we talked"
+
+
+def get_random_appointment_opener(relative_time):
+    """Get random opener from appointment-triggered-openers.txt.
+    
+    Reads lines directly from the file, skipping headers/comments.
+    Replaces any [APPOINTMENT_TIME] placeholder with relative_time.
+    Returns ready-to-use opener string.
+    """
+    try:
+        with open("library/appointment-triggered-openers.txt", "r") as f:
+            lines = f.readlines()
+        
+        # Extract openers (non-empty lines that aren't headers/comments)
+        openers = []
+        for line in lines:
+            line = line.strip()
+            # Skip empty lines, headers (###), comments (#), and section markers
+            if not line or line.startswith("#") or line.startswith("###") or line.startswith("---"):
+                continue
+            # Skip lines that are just descriptions/instructions
+            if line.startswith('"') and line.endswith('"'):
+                # Quoted format (if any)
+                openers.append(line[1:-1])
+            elif line and not line.startswith("(") and not line.startswith("Use ") and not line.startswith("All "):
+                # Regular line - could be an opener
+                # Check if it looks like an opener (starts with common words)
+                if any(line.lower().startswith(w) for w in ["hey", "hi", "hello", "guess", "surprise", "knock", "i'm", "i am", "just", "you", "this", "here"]):
+                    openers.append(line)
+        
+        if openers:
+            opener = random.choice(openers)
+            # Replace [APPOINTMENT_TIME] with relative_time
+            opener = opener.replace("[APPOINTMENT_TIME]", relative_time)
+            return opener
+    
+    except Exception as e:
+        logger.error(f"Error reading appointment-triggered-openers.txt: {e}")
+    
+    # Fallback
+    return f"I'm here as we planned {relative_time}"
+
+
+async def parse_and_schedule(response, user_msg=""):
+    """Parse AI response for commitments and create appointment if found."""
+    try:
+        from commitment_parser import create_appointment
+        
+        # Determine source
+        if "library f" in user_msg.lower():
+            source = "library_f"
+        elif user_msg.startswith("trigger"):
+            source = "ai_proposal"
+        else:
+            source = "user_request"
+        
+        appointment = create_appointment(response, user_msg, source)
+        
+        if appointment:
+            # Load existing data
+            if os.path.exists("appointments/appointments.json"):
+                with open("appointments/appointments.json") as fp:
+                    data = json.load(fp)
+            else:
+                data = {"appointments": [], "random_check": {}}
+            
+            # Add new appointment
+            data["appointments"].append(appointment)
+            
+            # Save
+            with open("appointments/appointments.json", "w") as fp:
+                json.dump(data, fp, indent=2)
+            
+            due_dt = datetime.fromisoformat(appointment["due"])
+            print(f"\n[Scheduled: {appointment.get('description', 'check-in')} at {due_dt.strftime('%H:%M')}]")
+    except Exception as e:
+        print(f"[Error scheduling: {e}]")
+
+
+def get_random_appointment_proposal():
+    """Load random phrase from library-f, add time reference (4-8 hours later)."""
+    import random
+    from datetime import datetime, timedelta
+    
+    # Find library-f file
+    import glob
+    files = glob.glob("library/library-f-*.txt")
+    
+    if not files:
+        return None
+    
+    # Pick random file (usually just one)
+    chosen_file = random.choice(files)
+    
+    with open(chosen_file, "r") as f:
+        lines = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+    
+    if not lines:
+        return None
+    
+    phrase = random.choice(lines)
+    
+    # Calculate future time (4-8 hours later)
+    now = datetime.now()
+    hours_later = random.randint(4, 8)
+    future_time = now + timedelta(hours=hours_later)
+    time_str = future_time.strftime("%-I:%M %p")  # e.g., "4:30 PM"
+    
+    # Add time reference to phrase
+    if "?" in phrase:
+        # Append time to question
+        return f"{phrase} Maybe around {time_str}?"
+    else:
+        # Add time in parentheses
+        return f"{phrase} (around {time_str})"
+
+
+def create_appointment_from_commitment(appointment_data, due_iso, user_msg=""):
+    """Create an appointment entry from parsed commitment data.
+    
+    Args:
+        appointment_data: Dict from parse_response_for_appointment()
+        due_iso: ISO format datetime string
+        user_msg: Original user message (for context)
+    """
+    try:
+        # Load current appointments
+        with open(APPOINTMENTS_FILE, "r") as f:
+            appt_data = json.load(f)
+        
+        if "appointments" not in appt_data:
+            appt_data["appointments"] = []
+        
+        # Get source
+        source = appointment_data.get("source", "user_request")
+        
+        # Build description
+        description = appointment_data.get("description", "")
+        if not description:
+            description = appointment_data.get("natural_text", "Scheduled check-in")
+        
+        # Add user message context if available
+        if user_msg:
+            description = f"{description} (from: '{user_msg[:50]}...')"
+        
+        # Create new appointment
+        new_appt = {
+            "id": f"appt_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "type": "commitment",
+            "created_at": datetime.now().isoformat(),
+            "source": source,
+            "description": description,
+            "due": due_iso,
+            "status": "pending"
+        }
+        
+        appt_data["appointments"].append(new_appt)
+        
+        # Save back
+        with open(APPOINTMENTS_FILE, "w") as f:
+            json.dump(appt_data, f, indent=2)
+        
+        logger.info(f"Created appointment {new_appt['id']} from commitment: {description}")
+        return new_appt["id"]
+    
+    except Exception as e:
+        logger.error(f"Failed to create appointment from commitment: {e}")
+        return None
 
 
 def select_combination():
@@ -180,12 +405,16 @@ def load_conversations():
     return []
 
 
-def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=None):
+def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=None, appointment_mode=False):
     if hour is None:
         hour = datetime.now().hour
     if context_str is None:
         context_str = "Activity: general chat"
-    if combo is None:
+    
+    # If appointment_mode, skip combo entirely
+    if appointment_mode:
+        combo = None
+    elif combo is None:
         combo = select_combination()
     
     # Load template
@@ -205,11 +434,12 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     day_note_instr = template.get("DAY_NOTE_INSTRUCTION", "Naturally incorporate any day note...")
     no_day_note_instr = template.get("NO_DAY_NOTE_INSTRUCTION", "Share what's on your mind naturally.")
     
-    intent = get_random_intent() if "a" in combo else None
-    cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+    # Only get combo components if combo is not None
+    intent = get_random_intent() if combo and "a" in combo else None
+    cue_code, cue_desc, _ = get_random_cue() if combo and "b" in combo else (None, None, None)
     
     # Use new 3-layer vibe system with mode
-    vibe_text = build_vibe_prompt(hour, mode) if "c" in combo else None
+    vibe_text = build_vibe_prompt(hour, mode) if combo and "c" in combo else None
     
     # Select appropriate instruction based on whether vibe has day note
     if vibe_text and "Day note:" in vibe_text:
@@ -220,18 +450,20 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     # Build task instructions dynamically based on combo letters
     task_parts = []
     
-    if "a" in combo:
-        intent = get_random_intent()
-        task_parts.append(f'Pick up this topic: "{intent}"')
-    
-    if "b" in combo:
-        cue_code, cue_desc, _ = get_random_cue()
-        task_parts.append(f'Also playing as: "{cue_desc}"')
-        # Store for later reference
-        task_parts.append(f'Context: {context_str}')
-    
-    if "c" in combo:
-        task_parts.append(f'In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}"')
+    # Only process combo components if combo is not None
+    if combo:
+        if "a" in combo:
+            intent = get_random_intent()
+            task_parts.append(f'Pick up this topic: "{intent}"')
+        
+        if "b" in combo:
+            cue_code, cue_desc, _ = get_random_cue()
+            task_parts.append(f'Also playing as: "{cue_desc}"')
+            # Store for later reference
+            task_parts.append(f'Context: {context_str}')
+        
+        if "c" in combo:
+            task_parts.append(f'In your next response, ANSWER AS IF playing a character defined by: "{vibe_text}"')
     
     # Always include user message for user_input mode
     if mode == "user_input" and context_str:
@@ -243,22 +475,32 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
             user_name = "Daniel"
         task_parts.append(f'After your wondering with your mind finally find the time to answer {user_name}\'s message: "{context_str}"')
     
-    # Handle additional libraries (d, e, f, etc.)
-    # Parse combo to find all library keys
-    combo_keys = combo.replace("_only", "").split("_")
-    
-    for lib_key in combo_keys:
-        if lib_key in ["a", "b", "c"]:
-            continue  # Already handled above
+    # Handle additional libraries (d, e, f, etc.) - only if combo exists
+    if combo:
+        # Parse combo to find all library keys
+        combo_keys = combo.replace("_only", "").split("_")
         
-        # Check if it's a valid library
-        from library_manager import LIBRARIES
-        if lib_key in LIBRARIES:
-            loader = get_loader(lib_key)
-            if loader:
-                result = loader()
-                if result:
-                    task_parts.append(f'Also: "{result}"')
+        # Check if library f is in combo (needs special instruction)
+        has_lib_f = "f" in combo_keys
+        
+        for lib_key in combo_keys:
+            if lib_key in ["a", "b", "c"]:
+                continue  # Already handled above
+            
+            # Check if it's a valid library
+            from library_manager import LIBRARIES
+            if lib_key in LIBRARIES:
+                loader = get_loader(lib_key)
+                if loader:
+                    result = loader()
+                    if result:
+                        task_parts.append(f'Also: "{result}"')
+        
+        # Add commitment guidance if library f was used
+        if has_lib_f:
+            pass
+    else:
+        has_lib_f = False
     
     if not task_parts:
         task_parts.append(f"Context: {context_str}")
@@ -339,148 +581,137 @@ async def proactive_monitor():
         if PROACTIVE_MODE:
             await check_proactive()
         
-        # Dynamic sleep: calculate time until next FUTURE contact
+        # Dynamic sleep: check BOTH sources for next contact
         try:
             from proactive_scheduler import get_next_future_proactive_contact
-            next_contact, seconds_until = get_next_future_proactive_contact()
+            next_proactive, seconds_proactive = get_next_future_proactive_contact()
         except:
-            next_contact, seconds_until = None, None
+            next_proactive, seconds_proactive = None, None
+        
+        # Also check appointments.json
+        next_appointment, seconds_appointment = get_next_appointment_due()
+        
+        # Determine which comes first
+        next_contact = None
+        seconds_until = float('inf')
+        
+        if next_proactive and seconds_proactive is not None:
+            if seconds_proactive < seconds_until:
+                next_contact = next_proactive
+                seconds_until = seconds_proactive
+        
+        if next_appointment and seconds_appointment is not None:
+            if seconds_appointment < seconds_until:
+                next_contact = next_appointment
+                seconds_until = seconds_appointment
         
         if next_contact is None:
-            # No pending contacts - sleep for 5 minutes (300s)
-            logger.info("No pending proactive contacts - sleeping 5 minutes")
-            await asyncio.sleep(300)
+            # No pending contacts - sleep for 1 minute (60s) to check more frequently
+            logger.info("No pending contacts - sleeping 1 minute")
+            await asyncio.sleep(60)
             continue
         
         if seconds_until > 60:
             # Contact is >1 minute away - sleep until 60s before it
             sleep_time = min(seconds_until - 60, 300)  # Cap at 5 minutes
-            logger.info(f"Next proactive contact in {seconds_until:.0f}s - sleeping {sleep_time:.0f}s")
+            logger.info(f"Next contact in {seconds_until:.0f}s - sleeping {sleep_time:.0f}s")
             await asyncio.sleep(sleep_time)
         else:
             # Contact is due soon (within 60s) - check frequently
             await asyncio.sleep(10)
 
 
+def get_next_appointment_due():
+    """Check appointments.json for the next pending appointment due.
+    
+    Returns:
+        tuple: (appointment_dict, seconds_until_due) or (None, None)
+    """
+    try:
+        if not os.path.exists(APPOINTMENTS_FILE):
+            return None, None
+        
+        with open(APPOINTMENTS_FILE) as fp:
+            data = json.load(fp)
+        
+        now = datetime.now()
+        earliest = None
+        earliest_seconds = float('inf')
+        
+        for appt in data.get("appointments", []):
+            if appt.get("status") == "pending":
+                due = datetime.fromisoformat(appt["due"])
+                seconds_until = (due - now).total_seconds()
+                
+                if seconds_until < earliest_seconds:
+                    earliest = appt
+                    earliest_seconds = seconds_until
+        
+        if earliest:
+            return earliest, earliest_seconds
+    
+    except Exception as e:
+        logger.error(f"Error checking appointments: {e}")
+    
+    return None, None
+
+
 async def check_proactive():
     """Check and trigger ALL contacts that are due."""
+    # Check proactive_schedule.json
     contacts = get_all_due_proactive_contacts()
+    
+    # Also check appointments.json for due appointments
+    if os.path.exists(APPOINTMENTS_FILE):
+        with open(APPOINTMENTS_FILE) as fp:
+            data = json.load(fp)
+            now = datetime.now()
+            for appt in data.get("appointments", []):
+                if appt.get("status") == "pending":
+                    due = datetime.fromisoformat(appt["due"])
+                    if due <= now:
+                        contacts.append(appt)
     
     for contact in contacts:
         hour = datetime.now().hour
         
-        # Get combo and components for display
-        combo = select_combination()
-        intent = get_random_intent() if "a" in combo else None
-        cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
-        vibe = get_random_vibe(hour) if "c" in combo else None
+        # Check if this is an appointment (from appointments.json)
+        is_appointment = contact.get("type") == "commitment" or contact.get("source") in ["user_request", "ai_proposal", "library_f"]
         
-        # Show what was picked
-        print(f"\n[Proactive: {contact['activity']}]")
-        print(f"Combination: {combo}")
-        if intent:
-            print(f" Intent: {intent[:60]}...")
-        if cue_code:
-            print(f" Cue: {cue_code}")
-        if vibe:
-            library = "day" if hour >= 6 else "night"
-            print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
-        
-        # Build context
-        context = "Activity: " + contact.get("activity", "chat")
-        
-        if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
-            recent = load_conversations()
-            if recent:
-                context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
-        
-        prompt = build_combinatorial_prompt(context_str=context, hour=hour)
-        save_prompt_to_log(prompt, "scheduled")
-        
-        response = await send_to_ollama(prompt)
-        print(f"\nSebastian: {response}")
-        complete_proactive_contact(contact["id"])
-
-
-async def vibe_monitor():
-    """Monitors time-based vibe changes."""
-    last_hour = datetime.now().hour
-    while True:
-        await asyncio.sleep(60)
-        current_hour = datetime.now().hour
-        if current_hour != last_hour:
-            logger.debug(f"Vibe shift: {last_hour} -> {current_hour}")
-            last_hour = current_hour
-
-
-def get_due_appointments():
-    """Get all appointments that are due from appointments.json."""
-    try:
-        data = sched_module.load_appointments()
-        now = datetime.now()
-        due = []
-        for appt in data.get("appointments", []):
-            if appt.get("status") == "pending":
-                due_time = datetime.fromisoformat(appt["due"])
-                if due_time <= now:
-                    due.append(appt)
-        return due
-    except:
-        return []
-
-
-def complete_appointment(appt_id):
-    """Mark an appointment as completed."""
-    try:
-        data = sched_module.load_appointments()
-        for appt in data.get("appointments", []):
-            if appt.get("id") == appt_id:
-                appt["status"] = "completed"
-                break
-        sched_module.save_appointments(data)
-    except:
-        pass
-
-
-async def appointment_check_loop():
-    """Monitors appointments.json for due appointments - smart scheduler."""
-    while True:
-        # Get next appointment timing
-        try:
-            from proactive_scheduler import get_next_appointment_info
-            next_appt, seconds_until = get_next_appointment_info()
-        except:
-            next_appt, seconds_until = None, None
-        
-        # Check APPOINTMENT_MODE at runtime
-        if os.getenv('APPOINTMENT_MODE', 'true').lower() != 'true':
-            await asyncio.sleep(60)  # Still check mode periodically
-            continue
-        
-        # Dynamic sleep based on next appointment
-        if next_appt is None:
-            # No appointments - sleep for 5 minutes (300s)
-            logger.info("No pending appointments - sleeping 5 minutes")
-            await asyncio.sleep(300)
-            continue
-        
-        if seconds_until > 60:
-            # Appointment is >1 minute away - sleep until 60s before it
-            sleep_time = min(seconds_until - 60, 300)  # Cap at 5 minutes
-            logger.info(f"Next appointment in {seconds_until:.0f}s - sleeping {sleep_time:.0f}s")
-            await asyncio.sleep(sleep_time)
-        else:
-            # Appointment is due soon (within 60s) - check frequently
-            await asyncio.sleep(10)
-        
-        # Now check for due appointments
-        appts = get_due_appointments()  # Get actual due appointments
-        
-        for appt in appts:
-            print(f"\n[Appointment: {appt.get('description', appt.get('activity', 'check-in'))[:50]}...]")
+        if is_appointment:
+            # APPOINTMENT MODE: No combo, use appointment-triggered-openers.txt ONLY
+            print(f"\n[Appointment Due: {contact.get('description', 'check-in')}]")
             
-            hour = datetime.now().hour
-            context = "Activity: " + appt.get("description", appt.get("activity", "check-in"))
+            # Load appointment-triggered opener
+            relative_time = "tomorrow" if "tomorrow" in contact.get("description", "").lower() else "today"
+            opener = get_random_appointment_opener(relative_time)
+            
+            context = f"Activity: {contact.get('description', 'Scheduled check-in')}. {opener if opener else ''}"
+            
+            # Build prompt with appointment_mode=True (cleaner than combo=None)
+            prompt = build_combinatorial_prompt(context_str=context, hour=hour, appointment_mode=True)
+            save_prompt_to_log(prompt, "appointment_due")
+            
+        else:
+            # Normal proactive contact - use combo
+            combo = select_combination()
+            intent = get_random_intent() if "a" in combo else None
+            cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+            vibe = get_random_vibe(hour) if "c" in combo else None
+            
+            # Show what was picked
+            print(f"\n[Proactive: {contact['activity']}]")
+            print(f"Combination: {combo}")
+            if intent:
+                print(f" Intent: {intent[:60]}...")
+            if cue_code:
+                print(f" Cue: {cue_code}")
+            if vibe:
+                library = "day" if hour >= 6 else "night"
+                print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+            
+            # Build context
+            context = "Activity: " + contact.get("activity", "chat")
             
             if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
                 recent = load_conversations()
@@ -488,54 +719,340 @@ async def appointment_check_loop():
                     context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
             
             prompt = build_combinatorial_prompt(context_str=context, hour=hour)
-            save_prompt_to_log(prompt, "appointment")
-            
-            response = await send_to_ollama(prompt)
-            print(f"\nSebastian: {response}")
-            complete_appointment(appt.get("id"))
+            save_prompt_to_log(prompt, "scheduled")
+        
+        response = await send_to_ollama(prompt)
+        print(f"\nSebastian: {response}")
+        
+        # Mark appointment as completed BEFORE parsing new ones
+        if is_appointment and 'id' in contact:
+            try:
+                with open(APPOINTMENTS_FILE, 'r') as fp:
+                    data = json.load(fp)
+                
+                updated = False
+                for appt in data.get("appointments", []):
+                    if appt.get("id") == contact['id']:
+                        appt["status"] = "completed"
+                        appt["completed_at"] = datetime.now().isoformat()
+                        updated = True
+                        break
+                
+                if updated:
+                    with open(APPOINTMENTS_FILE, 'w') as fp:
+                        json.dump(data, fp, indent=2)
+                    print(f"[Appointment {contact['id']} marked as completed]")
+            except Exception as e:
+                logger.error(f"Error updating appointment status: {e}")
+        
+        # Also mark proactive_schedule.json contacts as completed
+        elif not is_appointment and 'id' in contact:
+            try:
+                from proactive_scheduler import mark_contact_completed
+                mark_contact_completed(contact['id'])
+                print(f"[Proactive contact {contact['id']} marked as completed]")
+            except Exception as e:
+                logger.error(f"Error updating proactive contact status: {e}")
+        
+        # Parse and schedule after trigger response
+        await parse_and_schedule(response, "trigger")
+        return
 
 
 async def user_input_loop():
-    """Non-blocking user input."""
+    """Handle user input commands via stdin."""
     loop = asyncio.get_event_loop()
+    
     while True:
         try:
-            user_input = await loop.run_in_executor(None, lambda: input("\nYou: "))
-            if not user_input:
+            cmd = await loop.run_in_executor(None, input, "You: ")
+            cmd = cmd.strip()
+            if not cmd:
                 continue
-            user_input = user_input.strip()
-            await handle_command(user_input)
-        except (EOFError, KeyboardInterrupt):
-            break
+            
+            # ===== TRIGGER COMMANDS =====
+            if cmd == "trigger":
+                hour = datetime.now().hour
+                combo = select_combination()
+                intent = get_random_intent() if "a" in combo else None
+                cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
+                vibe = get_random_vibe(hour) if "c" in combo else None
+                
+                print(f"\n[Manual Trigger]")
+                print(f"Combination: {combo}")
+                if intent:
+                    print(f" Intent: {intent[:60]}...")
+                if cue_code:
+                    print(f" Cue: {cue_code}")
+                if vibe:
+                    library = "day" if hour >= 6 else "night"
+                    print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+                
+                context = "Activity: manual trigger"
+                if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+                    recent = load_conversations()
+                    if recent:
+                        context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
+                
+                prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+                save_prompt_to_log(prompt, "manual")
+                
+                response = await send_to_ollama(prompt)
+                print(f"\nSebastian: {response}")
+                await parse_and_schedule(response, cmd)
+                continue
+            
+            # ===== TRIGGER VIBE COMMAND =====
+            if cmd.startswith("trigger vibe "):
+                parts = cmd.split()
+                if len(parts) >= 3:
+                    letter = parts[2].lower()
+                    valid_libs = ['a', 'b', 'c', 'd', 'e', 'f']
+                    
+                    if letter in valid_libs:
+                        if letter == 'c':
+                            # Library c supports modes
+                            mode = parts[3] if len(parts) >= 4 else "1"
+                            hour = datetime.now().hour
+                            combo = f"{letter}_only"
+                            print(f"\n[Trigger Vibe - Mode {mode}]")
+                            print(f"Combo: {combo}")
+                            
+                            context = f"Activity: vibe test"
+                            prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo, mode=int(mode))
+                            save_prompt_to_log(prompt, f"vibe_test_{combo}_{mode}")
+                        else:
+                            # Non-c libraries: just trigger that library only (no mode)
+                            hour = datetime.now().hour
+                            combo = f"{letter}_only"
+                            print(f"\n[Trigger Vibe - Library {letter.upper()}]")
+                            print(f"Combo: {combo}")
+                            
+                            context = f"Activity: trigger library {letter}"
+                            prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo, mode=None)
+                            save_prompt_to_log(prompt, f"trigger_library_{letter}")
+                        
+                        response = await send_to_ollama(prompt)
+                        print(f"\nSebastian: {response}")
+                        await parse_and_schedule(response, cmd)
+                    else:
+                        print(f"[Unknown library: {letter}]")
+                else:
+                    print("[Usage: trigger vibe <letter> [mode for c only]]")
+                continue
+            
+            # ===== LIBRARY INFO =====
+            if cmd.startswith("library "):
+                letter = cmd.split()[1].lower()
+                if letter in LIBRARIES:
+                    lib = LIBRARIES[letter]
+                    print(f"\n[Library {letter.upper()}: {lib['name']}]")
+                    samples = []
+                    for f in lib.get("files", []):
+                        if os.path.exists(f):
+                            with open(f) as fp:
+                                lines = fp.readlines()
+                                samples.extend(lines[:3])
+                    for s in samples[:5]:
+                        print(f"  {s.strip()}")
+                else:
+                    print(f"[Unknown library: {letter}]")
+                continue
+            
+            # ===== RESET PARAMETERS =====
+            if cmd == "reset parameters":
+                print("[Restoring AI parameters to defaults...]")
+                try:
+                    restore_defaults()
+                    print("[Parameters restored to defaults]")
+                    print("[Restarting with default parameters...]")
+                    raise asyncio.CancelledError()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    print(f"[Could not restore parameters: {e}]")
+                continue
+            
+            # ===== MODEL COMMAND =====
+            if cmd.startswith("model "):
+                new_model = cmd.split(" ", 1)[1].strip().lower()
+                model_map = {
+                    "phi4": "phi4",
+                    "gemma4": "gemma4:26b",
+                }
+                if new_model in model_map:
+                    os.environ["COMPANION_MODEL"] = model_map[new_model]
+                    print(f"[Switched to model: {new_model}]")
+                else:
+                    available = ", ".join(model_map.keys())
+                    print(f"[Unknown model: {new_model}] Available: {available}")
+                continue
+            
+            # ===== PAUSE COMMANDS =====
+            if cmd == "pause proactive":
+                os.environ["PROACTIVE_MODE"] = "false"
+                print("[Proactive paused]")
+                continue
+            
+            if cmd == "pause appointment":
+                os.environ["APPOINTMENT_MODE"] = "false"
+                print("[Appointment check paused]")
+                continue
+            
+            # ===== RESUME COMMANDS =====
+            if cmd == "resume proactive":
+                os.environ["PROACTIVE_MODE"] = "true"
+                print("[Proactive resumed]")
+                continue
+            
+            if cmd == "resume appointment":
+                os.environ["APPOINTMENT_MODE"] = "true"
+                print("[Appointment check resumed]")
+                continue
+            
+            # ===== SKIP COMMAND =====
+            if cmd == "skip":
+                print("[Skipping next proactive contact]")
+                continue
+            
+            # ===== KILL OLLAMA =====
+            if cmd == "kill":
+                print("[Killing ollama process...]")
+                os.system("pkill -f ollama")
+                await asyncio.sleep(2)
+                print("[Restarting ollama...]")
+                os.system("ollama serve &")
+                await asyncio.sleep(3)
+                print("[Ollama restarted]")
+                continue
+            
+            # ===== STATUS COMMAND =====
+            if cmd == "status":
+                print(f"[Proactive: {'ON' if os.getenv('PROACTIVE_MODE', 'true').lower() == 'true' else 'OFF'}]")
+                print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
+                print(f"[Model: {os.getenv('COMPANION_MODEL', 'phi4')}]")
+                if os.path.exists("appointments/appointments.json"):
+                    with open("appointments/appointments.json") as fp:
+                        data = json.load(fp)
+                        pending = [a for a in data.get("appointments", []) if a.get("status") == "pending"]
+                        print(f"[Pending appointments: {len(pending)}]")
+                continue
+            
+            # ===== CLEAR SCHEDULE =====
+            if cmd == "clear-schedule":
+                if os.path.exists("appointments/appointments.json"):
+                    with open("appointments/appointments.json", "w") as fp:
+                        json.dump([], fp)
+                    print("[All scheduled appointments cleared]")
+                else:
+                    print("[No appointments to clear]")
+                continue
+            
+            # ===== CLEAR ALL =====
+            if cmd == "clear-all":
+                if os.path.exists(MEMORY_DIR):
+                    import shutil
+                    shutil.rmtree(MEMORY_DIR)
+                    os.makedirs(MEMORY_DIR)
+                    for f in ["fresh.json", "medium.json", "longterm.json"]:
+                        with open(os.path.join(MEMORY_DIR, f), "w") as fp:
+                            json.dump([], fp)
+                if os.path.exists("appointments/appointments.json"):
+                    os.remove("appointments/appointments.json")
+                print("[All user data cleared]")
+                continue
+            
+            # ===== MEMORY COMMANDS =====
+            if cmd.startswith("memory "):
+                subcmd = cmd.split(" ", 1)[1].strip().lower()
+                if subcmd == "status":
+                    if os.path.exists(MEMORY_DIR):
+                        for f in ["fresh.json", "medium.json", "longterm.json"]:
+                            path = os.path.join(MEMORY_DIR, f)
+                            if os.path.exists(path):
+                                with open(path) as fp:
+                                    data = json.load(fp)
+                                    print(f"[{f}: {len(data)} entries]")
+                elif subcmd == "on":
+                    os.environ["MEMORY_IN_PROMPT"] = "true"
+                    print("[Memory enabled in prompts]")
+                elif subcmd == "off":
+                    os.environ["MEMORY_IN_PROMPT"] = "false"
+                    print("[Memory disabled in prompts]")
+                continue
+            
+            # ===== SAVE COMMAND =====
+            if cmd == "save":
+                recent = load_conversations()
+                if recent:
+                    with open("conversation_save.json", "w") as fp:
+                        json.dump(recent, fp, indent=2)
+                    print("[Conversation saved to conversation_save.json]")
+                else:
+                    print("[No conversation to save]")
+                continue
+            
+            # ===== MENU COMMAND =====
+            if cmd == "menu":
+                print("\nCommands:")
+                print("  trigger       - Trigger proactive conversation")
+                print("  trigger vibe <combo> <mode> - Test vibe modes (combo=a_b_c, mode=1/2/3)")
+                print("                1=vibe, 2=+weekdays, 3=+longing")
+                print("                library <letter> - Show info about a library (a, b, c, d, e, f)")
+                print("  pause proactive - Pause proactive schedule")
+                print("  pause appointment - Pause appointment check")
+                print("  resume proactive - Resume proactive schedule")
+                print("  resume appointment - Resume appointment check")
+                print("  skip       - Skip current proactive contact")
+                print("  kill       - Kill ollama and restart")
+                print("  interval X - Set check interval to X minutes")
+                print("  status     - Show status")
+                print("  clear-schedule - Clear scheduled appointments")
+                print("  clear-all  - Clear all data")
+                print("  memory status - Show memory statistics")
+                print("  memory on   - Include recent memory in prompts")
+                print("  memory off  - Exclude recent memory from prompts")
+                print("  model X     - Switch model (phi4, gemma4)")
+                print("  save        - Save current conversation to disk")
+                print("  menu      - Show this commands menu")
+                print("  clear     - Clear screen")
+                print("  quit      - Exit")
+                print("  reset parameters - Reset to defaults and quit")
+                continue
+            
+            # ===== CLEAR SCREEN =====
+            if cmd == "clear":
+                os.system("clear")
+                continue
+            
+            # ===== QUIT COMMAND =====
+            if cmd == "quit":
+                print("\nSebastian: Talk soon!")
+                raise asyncio.CancelledError()
+            
+            # ===== DEFAULT: NORMAL CHAT =====
+            hour = datetime.now().hour
+            context = cmd
+            if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+                recent = load_conversations()
+                if recent:
+                    context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]]) + "\n" + cmd
+            
+            prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+            save_prompt_to_log(prompt, "user_chat")
+            
+            response = await send_to_ollama(prompt)
+            print(f"\nSebastian: {response}")
+            await parse_and_schedule(response, cmd)
+        
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            # Log error instead of silently ignoring
-            print(f"\n[ERROR processing message: {e}]")
-            import traceback
-            traceback.print_exc()
-
-
-async def handle_command(cmd):
-    """Handle user commands - async."""
-    global _global_interval
-    
-    if cmd in ["quit", "exit", "q"]:
-        print("\nSebastian: Talk soon!")
-        raise asyncio.CancelledError()
-    
-    # ===== KILL COMMAND =====
-    if cmd == "kill":
-        print("[Killing ollama process...]")
-        import subprocess
-        subprocess.run(["pkill", "-9", "-f", "ollama"], check=False)
-        print("[Waiting 2 minutes for ollama to restart...]")
-        await asyncio.sleep(120)
-        subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("[Ollama restarted]")
-        return
+            print(f"[Error processing command: {e}]")
+        continue
     
     
     # ===== RESET PARAMETERS =====
-    if cmd == "reset parameters":
         print("[Restoring AI parameters to defaults...]")
         try:
             restore_defaults()
@@ -546,10 +1063,8 @@ async def handle_command(cmd):
             raise
         except Exception as e:
             print(f"[Could not restore parameters: {e}]")
-        return
+        continue
 
-    # ===== MODEL COMMAND =====
-    if cmd.startswith("model "):
         new_model = cmd.split(" ", 1)[1].strip().lower()
         model_map = {
             "phi4": "phi4",
@@ -561,51 +1076,31 @@ async def handle_command(cmd):
         else:
             available = ", ".join(model_map.keys())
             print(f"[Unknown model: {new_model}] Available: {available}")
-        return
-    
-    # ===== PAUSE COMMANDS =====
-    if cmd == "pause proactive":
+        continue
         os.environ["PROACTIVE_MODE"] = "false"
         print("[Proactive paused]")
-        return
-    
-    if cmd == "pause appointment":
+        continue
         os.environ["APPOINTMENT_MODE"] = "false"
         print("[Appointment paused]")
-        return
-    
-    # ===== RESUME COMMANDS =====
-    if cmd == "resume proactive":
+        continue
         os.environ["PROACTIVE_MODE"] = "true"
         print("[Proactive resumed]")
-        return
-    
-    if cmd == "resume appointment":
+        continue
         os.environ["APPOINTMENT_MODE"] = "true"
         print("[Appointment resumed]")
-        return
-    
-    # ===== MEMORY COMMANDS =====
-    if cmd == "memory on":
+        continue
         os.environ["MEMORY_IN_PROMPT"] = "true"
         print("[Memory in prompts: ON]")
         print("[Recent: includes last 5 user messages]")
-        return
-    
-    if cmd == "memory off":
+        continue
         os.environ["MEMORY_IN_PROMPT"] = "false"
         print("[Memory in prompts: OFF]")
         print("[Recent: not included in prompts]")
-        return
-    
-    if cmd == "memory status":
+        continue
         memory_on = os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true"
         print(f"\n[Memory Status]")
         print(f"  In prompts: {'ON' if memory_on else 'OFF'}")
-        return
-    
-    # ===== TRIGGER =====
-    if cmd == "trigger":
+        continue
         print("\n[Triggering...]")
         hour = datetime.now().hour
         
@@ -646,25 +1141,92 @@ async def handle_command(cmd):
         
         response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
-        return
-    
-    # ===== TRIGGER VIBE (testing combos + modes) =====
-    if cmd.startswith("trigger vibe "):
+        continue
+        letter = cmd.split()[-1].lower()
+        valid_libs = ['a', 'b', 'c', 'd', 'e', 'f']
+        if letter in valid_libs:
+            hour = datetime.now().hour
+            combo = f"a_b_c_{letter}"
+            print(f"\n[Trigger Library {letter.upper()}]")
+            print(f"Combo: {combo}")
+            
+            context = f"Activity: trigger library {letter}"
+            prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo, mode=None)
+            save_prompt_to_log(prompt, f"trigger_library_{letter}")
+            
+            response = await send_to_ollama(prompt)
+            print(f"\nSebastian: {response}")
+            await parse_and_schedule(response, cmd)
+        else:
+            print(f"[Unknown library: {letter}]")
+        continue
         parts = cmd.split()
         
-        # Parse: trigger vibe [combo] [mode]
+        # Parse: trigger vibe <combo> <mode>
         if len(parts) < 3:
             print("[Usage: trigger vibe <combo> <mode>]")
             print("  combo: a_only, b_only, a_b, a_c, b_c, a_b_c, or any combo like d_e, a_c_d, etc.")
-            print("  mode: 1=vibe only, 2=+weekdays, 3=+longing, 4=+weather")
-            return
+            print("  mode: 1=vibe only, 2=+weekdays, 3=+longing")
+            continue
+        
+        combo_arg = parts[2]
+        mode = int(parts[3]) if len(parts) >= 4 else 1
+        
+        if mode not in [1, 2, 3]:
+            print("[Mode must be 1, 2, or 3]")
+            continue
+        
+        print(f"\n[Triggering combo {combo_arg} with vibe mode {mode}...]")
+        hour = datetime.now().hour
+        
+        # Show what was picked
+        print(f"Combination: {combo_arg}")
+        print(f" Mode: {mode}")
+        print(f" Model: {os.getenv('COMPANION_MODEL', 'phi4')}")
+        
+        # Dynamically load components based on combo
+        combo_keys = combo_arg.replace("_only", "").split("_")
+        
+        if "a" in combo_keys:
+            intent = get_random_intent()
+            print(f" Intent: {intent[:60]}...")
+        if "b" in combo_keys:
+            cue_code, cue_desc, _ = get_random_cue()
+            print(f" Cue: {cue_code}")
+        
+        # Build and show vibe (if c in combo)
+        if "c" in combo_keys:
+            vibe_text = build_vibe_prompt(hour, mode)
+            print(f" Vibe: {vibe_text[:100]}...")
+        
+        # Show additional libraries (d, e, f, ...)
+        for key in combo_keys:
+            if key not in ["a", "b", "c"]:
+                print(f" Library {key}: [auto-discovered]")
+        
+        # Build context and prompt
+        context = "Activity: manual trigger"
+        if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
+            recent = load_conversations()
+            if recent:
+                context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
+        
+        prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo_arg, mode=mode)
+        save_prompt_to_log(prompt, f"trigger_vibe_{mode}")
+        
+        response = await send_to_ollama(prompt)
+        print(f"\nSebastian: {response}")
+        
+        # Parse and schedule after trigger response
+        await parse_and_schedule(response, cmd)
+        continue
         
         combo_arg = parts[2]
         mode = int(parts[3]) if len(parts) >= 4 else 1
         
         if mode not in [1, 2, 3, 4]:
             print("[Mode must be 1, 2, 3, or 4]")
-            return
+            continue
         
         print(f"\n[Triggering combo {combo_arg} with vibe mode {mode}...]")
         hour = datetime.now().hour
@@ -706,31 +1268,21 @@ async def handle_command(cmd):
         
         response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
-        return
-    
-    # ===== SKIP =====
-    if cmd == "skip":
+        continue
         contact = get_next_proactive_contact()
         if contact:
             print(f"[Skipped: {contact['activity']}]")
-        return
-    
-    # ===== CLEAR COMMANDS =====
-    if cmd == "clear":
+        continue
         print("\033[2J\033[H")
         print("=" * 50)
         print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
         print("=" * 50)
-        return
-    
-    if cmd == "clear-schedule":
+        continue
         # Import scheduler module
         import scheduler as auto_sched
         auto_sched.save_appointments({"appointments": [], "random_check": None})
         print("[All appointments cleared]")
-        return
-    
-    if cmd == "clear-all":
+        continue
         import scheduler as auto_sched
         # Clear appointments
         auto_sched.save_appointments({"appointments": [], "random_check": None})
@@ -739,10 +1291,7 @@ async def handle_command(cmd):
             with open(os.path.join(MEMORY_DIR, f), "w") as fp:
                 json.dump([], fp)
         print("[All data cleared]")
-        return
-    
-    # ===== SAVE CONVERSATION =====
-    if cmd == "save":
+        continue
         # Load last interaction (user message + AI response)
         try:
             with open(LAST_INTERACTION_FILE) as f:
@@ -751,11 +1300,11 @@ async def handle_command(cmd):
                 ai_msg = data.get("ai_message", "")
         except:
             print("[No conversation to save]")
-            return
+            continue
         
         if not user_msg and not ai_msg:
             print("[No conversation to save]")
-            return
+            continue
         
         # Create filename: YYYY-MM-DD_HH-MM-SS_first_60_chars.txt
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -772,10 +1321,7 @@ async def handle_command(cmd):
             f.write(f"Sebastian: {ai_msg}\n")
         
         print(f"[Conversation saved to {filepath}]")
-        return
-    
-    # ===== STATUS =====
-    if cmd == "status":
+        continue
         print(f"\n[Status]")
         print(f"  Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}")
         
@@ -806,31 +1352,19 @@ async def handle_command(cmd):
                 print(f"  Next Appointment: {due_dt.strftime('%Y-%m-%d %H:%M')} (id={next_appt['id']}, {next_appt['activity'][:30]}...)")
         except Exception as e:
             pass
-        return
-    
-    # ===== INTERVAL =====
-    if cmd.startswith("interval "):
-        try:
-            new_interval = int(cmd.split()[1])
-            _global_interval = new_interval
-            print(f"[Interval set to {new_interval} minutes]")
-        except:
-            print("[Usage: interval X]")
-        return
-    
-    # ===== MENU =====
-    if cmd == "menu":
+        continue
         print("\nCommands:")
         print("  trigger       - Trigger proactive conversation")
-        print("  trigger vibe <combo> <mode> - Test vibe modes (combo=a_b_c, mode=1/2/3)")
-        print("                1=vibe, 2=+weekdays, 3=+longing")
+        print("  trigger vibe <letter> [mode for c only] - Test vibe modes")
+        print("                c 1=vibe, 2=+weekdays, 3=+longing, 4=+weather")
+        print("                a/b/d/e/f: triggers that library only")
+        print("  library <letter> - Show info about a library")
         print("  pause proactive - Pause proactive schedule")
         print("  pause appointment - Pause appointment check")
         print("  resume proactive - Resume proactive schedule")
         print("  resume appointment - Resume appointment check")
         print("  skip       - Skip current proactive contact")
         print("  kill       - Kill ollama and restart")
-        print("  interval X - Set check interval to X minutes")
         print("  status     - Show status")
         print("  clear-schedule - Clear scheduled appointments")
         print("  clear-all  - Clear all data")
@@ -843,30 +1377,106 @@ async def handle_command(cmd):
         print("  clear     - Clear screen")
         print("  quit      - Exit")
         print("  reset parameters - Reset to defaults and quit")
-        return
-    
-    # Combo trigger chance on normal user message
-    if is_combo_on_user_message() and random.random() < get_combo_trigger_chance():
+        continue
+        lib_letter = cmd.split()[1].strip().lower() if len(cmd.split()) > 1 else ""
+        
+        if not lib_letter or len(lib_letter) != 1:
+            print("[Usage: library <letter> - e.g., library f]")
+            print("[Available libraries: ", end="")
+            from library_manager import LIBRARIES
+            print(", ".join(sorted(LIBRARIES.keys())))
+            continue
+        
+        from library_manager import LIBRARIES
+        if lib_letter not in LIBRARIES:
+            print(f"[Library '{lib_letter}' not found]")
+            continue
+        
+        lib = LIBRARIES[lib_letter]
+        print(f"\n[Library {lib_letter}]")
+        print(f"  Name: {lib.get('name', 'unknown')}")
+        print(f"  Enabled: {lib.get('enabled', False)}")
+        print(f"  Weight bias: {lib.get('weight_bias', 1.0)}")
+        print(f"  Max combo: {lib.get('max_combo', 3)}")
+        print(f"  Auto-discovered: {lib.get('auto_discovered', False)}")
+        
+        # Show file paths
+        files = lib.get("file", [])
+        if isinstance(files, str):
+            files = [files]
+        if files:
+            print(f"  Files:")
+            for f in files:
+                print(f"    - {f}")
+        
+        # Show loader info
+        if lib.get("loader_module") and lib.get("loader_func"):
+            print(f"  Loader: {lib['loader_module']}.{lib['loader_func']}()")
+        else:
+            print(f"  Loader: default (random line)")
+        
+        # Try to get a sample
+        try:
+            from library_manager import get_loader
+            loader = get_loader(lib_letter)
+            if loader:
+                sample = loader()
+                if sample:
+                    print(f"  Sample: \"{sample[:100]}...\"")
+        except:
+            pass
+        
+        continue
         combo = select_combination()
         print(f"\n[Combo triggered: {combo}]")
         prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
         response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
-    else:
+        await parse_and_schedule(response, cmd)
+        continue
         # Unknown command: send to AI as free text
-        response = await send_to_ollama(cmd)
+        # Only trigger combo based on config chance
+        if is_combo_on_user_message() and random.random() < get_combo_trigger_chance():
+            combo = select_combination()
+            print(f"\n[Combo triggered: {combo}]")
+            
+            # Show components (like trigger command)
+            hour = datetime.now().hour
+            combo_keys = combo.replace("_only", "").split("_")
+            
+            if "a" in combo_keys:
+                intent = get_random_intent()
+                print(f" Intent: {intent[:60]}...")
+            
+            if "b" in combo_keys:
+                cue_code, cue_desc, _ = get_random_cue()
+                print(f" Cue: {cue_code}")
+            
+            if "c" in combo_keys:
+                vibe = get_random_vibe(hour)
+                library = "day" if hour >= 6 else "night"
+                print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
+            
+            # Show additional libraries
+            for key in combo_keys:
+                if key not in ["a", "b", "c"]:
+                    print(f" Library {key}: [auto-discovered]")
+            
+            prompt = build_combinatorial_prompt(context_str=cmd, combo=combo, mode="user_input")
+        else:
+            prompt = build_combinatorial_prompt(context_str=cmd, combo=None, mode="user_input")
+        
+        response = await send_to_ollama(prompt)
         print(f"\nSebastian: {response}")
-    
-    # Save last interaction for "save" command
-    try:
+        await parse_and_schedule(response, cmd)
         with open(LAST_INTERACTION_FILE, "w") as f:
             json.dump({
                 "user_message": cmd if not cmd.startswith("trigger") else "",
                 "ai_message": response,
                 "timestamp": datetime.now().isoformat()
             }, f, indent=2)
-    except:
         pass
+
 
 
 async def async_main():
@@ -875,14 +1485,16 @@ async def async_main():
     _, sparse, norm_sched, warn_sched = validate_schedule_percentages()
     if warn_sched:
         logger.warning(f"CONFIG: {warn_sched}")
-    
+
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
     print("=" * 50)
     print("\nCommands:")
     print("  trigger       - Trigger proactive conversation")
-    print("  trigger vibe <combo> <mode> - Test vibe modes (combo=a_b_c, mode=1/2/3)")
-    print("                1=vibe, 2=+weekdays, 3=+longing")
+    print("  trigger vibe <letter> [mode for c only] - Test vibe modes")
+    print("                c 1=vibe, 2=+weekdays, 3=+longing, 4=+weather")
+    print("                a/b/d/e/f: triggers that library only")
+    print("  library <letter> - Show info about a library")
     print("  pause proactive - Pause proactive schedule")
     print("  pause appointment - Pause appointment check")
     print("  resume proactive - Resume proactive schedule")
@@ -906,16 +1518,13 @@ async def async_main():
     print(f"[Proactive: {'ON' if PROACTIVE_MODE else 'OFF'}]")
     print(f"[Appointment: {'ON' if os.getenv('APPOINTMENT_MODE', 'true').lower() == 'true' else 'OFF'}]")
     print(f"[Model: {os.getenv('COMPANION_MODEL', 'phi4')}]")
-    print(f"[Interval: {_global_interval}min]")
     print()
     
     tasks = [
         asyncio.create_task(proactive_monitor()),
-        asyncio.create_task(vibe_monitor()),
-        asyncio.create_task(appointment_check_loop()),
         asyncio.create_task(user_input_loop()),
     ]
-    
+
     try:
         await asyncio.gather(*tasks)
     except asyncio.CancelledError:
@@ -935,7 +1544,7 @@ def main():
         for f in ["fresh.json", "medium.json", "longterm.json"]:
             with open(os.path.join(MEMORY_DIR, f), "w") as fp:
                 json.dump([], fp)
-    
+
     try:
         asyncio.run(async_main())
     except KeyboardInterrupt:

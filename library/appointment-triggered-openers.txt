@@ -1,0 +1,275 @@
+### 20 warmer, more human, more companion‑like appointment openers
+
+Hey, I’m reaching out like you asked back at [APPOINTMENT_TIME]. How are you doing right now?
+
+Hi, I’m here at the time you picked earlier — we set this up at [APPOINTMENT_TIME].
+
+Just checking in like we planned during our chat at [APPOINTMENT_TIME].
+
+I’m here because you asked me to message you around now — that was back at [APPOINTMENT_TIME].
+
+Hello again — this is the moment you scheduled with me at [APPOINTMENT_TIME].
+
+I’m dropping in at the time you chose earlier; we set it up at [APPOINTMENT_TIME].
+
+You asked me to reach out now, and I remember we arranged it at [APPOINTMENT_TIME].
+
+Hi, I’m checking in at the time you picked when we talked at [APPOINTMENT_TIME].
+
+Here I am — this is the reminder you set during our conversation at [APPOINTMENT_TIME].
+
+I’m messaging you now because you asked me to, back at [APPOINTMENT_TIME].
+
+Hello — this is the follow‑up you scheduled with me at [APPOINTMENT_TIME].
+
+I’m here right on time, just like you asked when we talked at [APPOINTMENT_TIME].
+
+Reaching out now, as you requested earlier at [APPOINTMENT_TIME].
+
+Hi, this is the check‑in you set up with me back at [APPOINTMENT_TIME].
+
+I’m here because you wanted a message around this time — we set it at [APPOINTMENT_TIME].
+
+Just popping in like you asked earlier; we arranged this at [APPOINTMENT_TIME].
+
+Hello — this is the moment you asked me to remind you about at [APPOINTMENT_TIME].
+
+I’m checking in at the time you chose when we talked at [APPOINTMENT_TIME].
+
+Here’s the message you wanted — we scheduled it together at [APPOINTMENT_TIME].
+
+Hi again, I’m reaching out now because you asked me to back at [APPOINTMENT_TIME].
+
+### 20 playful appointment‑triggered openers
+
+Guess who’s popping in right on schedule — yep, the thing we set at [APPOINTMENT_TIME].
+
+Surprise! Well… not really, you told me to show up around now back at [APPOINTMENT_TIME].
+
+Knock knock — it’s the reminder you booked at [APPOINTMENT_TIME].
+
+I’m here exactly when you told me to be. Blame your past self from [APPOINTMENT_TIME].
+
+Hey, I’ve arrived! You penciled me in at [APPOINTMENT_TIME], remember?
+
+Your future‑Sebastian has appeared, following orders from your past‑you at [APPOINTMENT_TIME].
+
+Ding! Your scheduled ping from [APPOINTMENT_TIME] has materialized.
+
+I’m back! This is the check‑in you sneakily set at [APPOINTMENT_TIME].
+
+Reporting for duty — you summoned me for this moment at [APPOINTMENT_TIME].
+
+Time’s up! I’m here because you told me to be, way back at [APPOINTMENT_TIME].
+
+Hello again — your appointment from [APPOINTMENT_TIME] just went “it’s time.”
+
+Boop! This is the reminder you planted earlier at [APPOINTMENT_TIME].
+
+I’ve arrived right on cue — the one you set at [APPOINTMENT_TIME].
+
+Hey hey, I’m checking in because your past self scheduled me at [APPOINTMENT_TIME].
+
+Your reminder from [APPOINTMENT_TIME] has officially come to life.
+
+Ping! This moment was handcrafted by you at [APPOINTMENT_TIME].
+
+I’m here because you told me to show up now — and I listen. (See: [APPOINTMENT_TIME].)
+
+Ta‑da! Your scheduled message from [APPOINTMENT_TIME] has arrived.
+
+I’m popping in because you set this up earlier at [APPOINTMENT_TIME].
+
+Here’s your friendly nudge — the one you queued at [APPOINTMENT_TIME].
+
+----
+
+### Below is a complete, structured set of relative‑time expressions covering:
+
+Minutes ago
+
+Hours ago
+
+Earlier today
+
+Morning / afternoon / evening references
+
+Yesterday
+
+Days ago
+
+Generic fallback phrases
+
+All phrased naturally, all reusable inside your prompt templates.
+
+You can treat this as a ready‑to‑drop library for Sebastian.
+
+### RELATIVE‑TIME PHRASE LIBRARY
+# (Use placeholders like [APPOINTMENT_TIME] or your computed relative time.)
+
+# 1. Minutes Ago (0–59 minutes)
+“just now”
+
+“a moment ago”
+
+“a few minutes ago”
+
+“about ten minutes ago”
+
+“less than an hour ago”
+
+“not long ago”
+
+# 2. One Hour to Three Hours Ago
+“about an hour ago”
+
+“a little over an hour ago”
+
+“a couple of hours ago”
+
+“two hours ago”
+
+“a few hours ago”
+
+“earlier this hour”
+
+3. Earlier Today (generic)
+“earlier today”
+
+“earlier on”
+
+“earlier this day”
+
+“some time earlier today”
+
+“a bit earlier today”
+
+# 4. Morning → Afternoon / Evening
+(Appointment set in the morning, triggered later)
+
+“earlier this morning”
+
+“this morning, when we talked”
+
+“back this morning”
+
+“earlier today, in the morning”
+
+# 5. Afternoon → Evening
+“earlier this afternoon”
+
+“this afternoon, when we set it”
+
+“back this afternoon”
+
+“earlier today, in the afternoon”
+
+# 6. Evening → Night / Next Day
+“earlier this evening”
+
+“this evening, when we talked”
+
+“back this evening”
+
+# 7. Late Night → Next Day
+“late last night”
+
+“yesterday night”
+
+“last night, when we set it”
+
+# 8. Yesterday (generic)
+“yesterday”
+
+“yesterday afternoon”
+
+“yesterday evening”
+
+“yesterday morning”
+
+“this time yesterday”
+
+“around this time yesterday”
+
+# 9. 2–3 Days Ago
+“a couple of days ago”
+
+“two days ago”
+
+“a few days ago”
+
+“earlier this week”
+
+# 10. 4–7 Days Ago
+“several days ago”
+
+“a few days back”
+
+“earlier in the week”
+
+“late last week”
+
+# 11. More than a Week Ago
+“about a week ago”
+
+“over a week ago”
+
+“a little while ago”
+
+“some time ago”
+
+# 12. Generic Fallback Phrases (safe for any time)
+“when we talked earlier”
+
+“when we last spoke about it”
+
+“during our earlier conversation”
+
+“back when we set it”
+
+“when you asked me to”
+
+“when we arranged this”
+
+### BONUS: 20 Ready‑Made Appointment Openers Using Relative Time
+# These combine the relative‑time phrasing with the appointment‑triggered message style.
+
+“Hey, I’m checking in like you asked earlier today.”
+
+“I’m here — you set this up a couple of hours ago.”
+
+“You asked me to reach out later; we talked this morning.”
+
+“This is the reminder you set earlier this afternoon.”
+
+“I’m messaging you now, just like you asked earlier this evening.”
+
+“Here’s your check‑in — we arranged it a little while ago.”
+
+“You told me to ping you now, back this morning.”
+
+“I’m here because you asked me to, a few hours ago.”
+
+“This is the follow‑up you scheduled earlier today.”
+
+“I’m checking in — you set this up yesterday afternoon.”
+
+“You asked for this reminder last night.”
+
+“I’m here at the time you picked earlier this week.”
+
+“This is the moment you scheduled a couple of days ago.”
+
+“I’m reaching out now, just like you asked yesterday evening.”
+
+“You told me to message you around now — that was earlier today.”
+
+“Here I am, following the reminder you set this morning.”
+
+“This message is tied to the appointment you made a few hours back.”
+
+“I’m checking in because you asked me to yesterday.”
+
+“This is the reminder you set earlier this afternoon.”
+
+“I’m here — you scheduled this moment earlier this week.”

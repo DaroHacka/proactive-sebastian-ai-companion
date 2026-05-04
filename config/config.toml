@@ -1,5 +1,5 @@
 [user]
-name = "Daniel"
+name = "Elias"
 email = "your_email@gmail.com"
 
 [paths]
@@ -36,7 +36,6 @@ combo_trigger_chance = 0.20
 combo_on_user_message = true
 
 [timing]
-scheduler_interval_minutes = 10
 proactive_check_seconds = 60  # Changed from 30 for power efficiency
 appointment_check_seconds = 60  # Changed from 30 for power efficiency
 
@@ -45,7 +44,7 @@ day_commentary_chance = 0.10
 weekend_longing_chance = 0.10
 
 [weather]
-location = "San_Gregorio_nelle_Alpi"  # User's location for wttr.in
+location = "Paris"  # User's location for wttr.in
 # c4 distribution weights (must sum to 1.0)
 explicit_only_weight = 0.50    # 50%: only explicit mention (c4_explicit_mention.txt)
 both_weight = 0.25              # 25%: both explicit + mood-based
@@ -63,6 +62,7 @@ b = 1.0    # cue
 c = 1.0    # vibe
 d = 1.0    # initiative (auto-discovered)
 e = 1.0    # books (auto-discovered)
+f = 0.0    # appointment proposal (auto-discovered, DISABLED by default)
 # Add more as auto-discovered: f, g, h, etc.
 
 [libraries]
@@ -80,6 +80,12 @@ e = 1.0    # books (auto-discovered)
     weight_bias = 2.0
     max_combo = 3
     enabled = true
+
+  # Library f - appointment proposal (auto-discovered, disabled by default)
+  [libraries.f]
+    weight_bias = 0.1  # Change from 0.0 to 0.1 for testing
+    max_combo = 3
+    enabled = true      # Change from false to true for testing
 
 [schedule]
 contacts_sparse_min = 2

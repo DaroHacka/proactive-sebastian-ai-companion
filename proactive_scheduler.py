@@ -1411,6 +1411,35 @@ def log_weather_type(weather_code, weather_type, explicit_text=None, mood_text=N
             f.write(f"\nMood-Based Impulse:\n{mood_text}\n")
 
 
+def mark_contact_completed(contact_id):
+    """Mark a proactive contact as completed in proactive_schedule.json.
+    
+    Args:
+        contact_id: The ID of the contact to mark as completed
+    """
+    try:
+        if not os.path.exists(PROACTIVE_SCHEDULE_FILE):
+            return
+        
+        with open(PROACTIVE_SCHEDULE_FILE, 'r') as f:
+            data = json.load(f)
+        
+        updated = False
+        for contact in data.get("contacts", []):
+            if contact.get("id") == contact_id:
+                contact["status"] = "completed"
+                contact["completed_at"] = datetime.now().isoformat()
+                updated = True
+                break
+        
+        if updated:
+            with open(PROACTIVE_SCHEDULE_FILE, 'w') as f:
+                json.dump(data, f, indent=2)
+            logger.info(f"Marked contact {contact_id} as completed")
+    except Exception as e:
+        logger.error(f"Error marking contact {contact_id} as completed: {e}")
+
+
 # Auto-initialize on module load
 if __name__ != "__main__":
     try:
