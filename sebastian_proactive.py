@@ -118,6 +118,7 @@ from proactive_scheduler import (
     get_all_due_proactive_contacts,
     complete_proactive_contact,
     get_random_vibe,
+    build_vibe_prompt,
     get_current_date_info,
 )
 
@@ -458,7 +459,7 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     cue_code, cue_desc, _ = get_random_cue() if combo and "b" in combo else (None, None, None)
     
     # Use new 3-layer vibe system with mode
-    vibe_text = get_random_vibe(hour) if combo and "c" in combo else None
+    vibe_text = build_vibe_prompt(hour, mode) if combo and "c" in combo else None
     
     # Select appropriate instruction based on whether vibe has day note
     if vibe_text and "Day note:" in vibe_text:
