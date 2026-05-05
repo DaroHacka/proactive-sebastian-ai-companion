@@ -62,7 +62,7 @@ b = 1.0    # cue
 c = 1.0    # vibe
 d = 1.0    # initiative (auto-discovered)
 e = 1.0    # books (auto-discovered)
-f = 0.0    # appointment proposal (auto-discovered, DISABLED by default)
+f = 0.05    # appointment proposal (auto-discovered, DISABLED by default)
 # Add more as auto-discovered: f, g, h, etc.
 
 [libraries]
@@ -81,11 +81,11 @@ f = 0.0    # appointment proposal (auto-discovered, DISABLED by default)
     max_combo = 3
     enabled = true
 
-  # Library f - appointment proposal (auto-discovered, disabled by default)
+  # Library f - appointment proposal (auto-discovered)
   [libraries.f]
-    weight_bias = 0.1  # Change from 0.0 to 0.1 for testing
+    weight_bias = 0.05  # Very seldom (5% chance)
     max_combo = 3
-    enabled = true      # Change from false to true for testing
+    enabled = true
 
 [schedule]
 contacts_sparse_min = 2

@@ -1,0 +1,294 @@
+### Category 1 - Generic Follow‑Up Suggestions (20 lines)
+How about we connect again later?
+
+Want to pick this up a bit later?
+
+Should we check in on this again soon?
+
+Maybe we revisit this later today?
+
+Want me to follow up with you later?
+
+We can continue this in a little while if you want.
+
+Should we circle back to this soon?
+
+Want to touch base again later?
+
+We can pick this up again whenever you like - maybe later today?
+
+Want me to reach out again in a bit?
+
+Should we come back to this later?
+
+If you want, we can continue this conversation later.
+
+Want to set a moment to follow up?
+
+We can return to this soon - just say the word.
+
+Should we plan to talk about this again later?
+
+Want me to check in again after some time?
+
+We can pause here and continue later if that works for you.
+
+Should we leave this for a little later and pick it up then?
+
+Want to schedule a quick follow‑up?
+
+We can come back to this soon - want me to remind you?
+
+### Category 2 - Time‑Frame Suggestions (20 lines)
+How about we check in later today?
+
+Want me to reach out this afternoon?
+
+Should we continue this tonight?
+
+Maybe we pick this up tomorrow morning?
+
+Want a follow‑up sometime tomorrow afternoon?
+
+How about we reconnect tomorrow evening?
+
+Should I check in with you later tonight?
+
+Want me to reach out early tomorrow?
+
+We can continue this later this week if you prefer.
+
+How about we revisit this sometime this weekend?
+
+Want me to follow up later this evening?
+
+Should we come back to this tomorrow?
+
+We can pick this up again later today if that works.
+
+Want me to check in sometime later this morning?
+
+How about we continue this later in the afternoon?
+
+Should I reach out again later tonight?
+
+Want to revisit this early next week?
+
+We can circle back to this later this week if you want.
+
+How about we reconnect tomorrow, whenever you're free?
+
+Want me to follow up sometime later today?
+
+### Category 3 - Reason‑Based Suggestions (20 lines)
+You seem busy - want me to check in later instead?
+
+If you need a moment to think, I can follow up later today.
+
+This feels like something worth revisiting - want me to reach out again later?
+
+If you'd like some space to process this, I can ping you tonight.
+
+You've got a lot going on - want me to check in tomorrow morning?
+
+If you're in the middle of something, I can follow up in a few hours.
+
+This might be easier to continue later - want me to remind you?
+
+If you want to take a break, I can reach out again this afternoon.
+
+You sound a bit overwhelmed - want me to check in later today?
+
+If you'd prefer to continue this with a fresh mind, I can message you later.
+
+This feels like a good stopping point - want me to pick it up later?
+
+If you want to think it over, I can follow up tomorrow.
+
+This might benefit from a pause - want me to follow up later today?
+
+If you'd like to return to this with more time, I can check in later.
+
+You seem focused on something else - want me to reconnect in a bit?
+
+If you need a breather, I can check in again soon.
+
+We can return to this later - I can remind you if you want.
+
+If you'd prefer to continue this later, I can reach out then.
+
+I can follow up later tonight if that works better for you.
+
+If you want to take a break, I can check in again later today.
+
+We can continue this soon - I can follow up whenever you prefer.
+
+### Category 4 - Soft, Warm Companion‑Like Suggestions (20 lines)
+If it helps, I can check in with you later.
+
+Want me to reach out again when things feel a bit calmer?
+
+I can follow up later today if that feels easier for you.
+
+If you'd like, I can message you again in a little while.
+
+We can continue this later - just tell me when you'd prefer.
+
+If you want some space, I can check in again later on.
+
+I can reach out tonight if that feels more comfortable.
+
+Want me to follow up when you have a quieter moment?
+
+If you'd like more time, I can message you again tomorrow.
+
+I can check in later - same vibe, new timestamp.
+
+Want a gentle reminder later today?
+
+Should I check in again soon, like a friendly digital tap on the shoulder?
+
+I can pop back in later - digitally speaking.
+
+Want a tiny nudge later today?
+
+Should I show up later like a punctual gremlin?
+
+I can drop by again this evening with impeccable timing.
+
+Want me to circle back like a boomerang with good intentions?
+
+Should I ping you later before the day escapes?
+
+I can pop up again tomorrow morning, bright and chirpy.
+
+Want a playful reminder later today?
+
+### Category 5 - Playful / Lighthearted Suggestions (20 lines)
+Should I boop you again later?
+
+Want a friendly ping sometime today?
+
+I can pop back in later - want me to?
+
+Should I sneak into your notifications tonight?
+
+Want me to reappear in a few hours like a polite ghost?
+
+I can swing by later - digitally speaking.
+
+Want a tiny nudge later today?
+
+Should I show up later like a punctual gremlin?
+
+I can check in later - same vibe, new timestamp.
+
+Want a surprise-but-not-really surprise message later?
+
+Should I hop back into your day this afternoon?
+
+I can pop up again tomorrow morning, bright and chirpy.
+
+Want a playful reminder later today?
+
+Should I check in again soon, like a friendly digital tap on the shoulder?
+
+I can reach out again later in the week when things settle?
+
+How about we pick this up later this evening, maybe at 7:45?
+
+Want me to follow up later this week, maybe on Friday around 3?
+
+Should we revisit this next Friday?
+
+I can reach out again later tonight if that works for you.
+
+Want me to materialize again later today?
+
+### Category 6 - Weekly / Multi‑Day Suggestions (20 lines)
+Want me to check in later this week?
+
+Should we revisit this sometime next week?
+
+How about we pick this up early next week?
+
+Want me to follow up toward the end of the week?
+
+We can continue this later this week if that works for you.
+
+Should I reach out again next Monday?
+
+Want me to check in mid‑week?
+
+How about we reconnect sometime this weekend?
+
+We can pick this up again next week if you prefer.
+
+Want me to follow up in a few days?
+
+Should we circle back to this later in the week?
+
+How about we revisit this next Friday?
+
+Want me to check in again in a couple of days?
+
+We can return to this early next week if that feels better.
+
+Should I follow up later this weekend?
+
+Want me to reach out again toward mid‑week?
+
+How about we continue this next Tuesday?
+
+We can pick this up again in a few days - want me to remind you?
+
+Should I check in again sometime next weekend?
+
+Want me to follow up later in the week when things settle?
+
+How about we reconnect next Wednesday afternoon?
+
+### Category 7 - “Let’s Continue This” Narrative Suggestions (20 lines)
+Let's pick this up later.
+
+We can continue this soon if you want.
+
+Let's come back to this a bit later.
+
+We can revisit this later today.
+
+Let's return to this when you're ready.
+
+We can dive back into this later if that works for you.
+
+Let's pause here and continue later.
+
+We can pick up this thread again soon.
+
+Let's come back to this tomorrow.
+
+We can continue this conversation later today.
+
+Let's revisit this when you have a moment.
+
+We can return to this with fresh energy later.
+
+Let's keep this going later on.
+
+We can pick this up again whenever you're free.
+
+Let's continue this tomorrow morning.
+
+We can come back to this later this afternoon.
+
+Let's revisit this soon - it's worth continuing.
+
+We can jump back into this later if you'd like.
+
+Let's circle back to this when you're ready to dive deeper.
+
+We can pick this up again whenever inspiration strikes.
+
+Let's continue this next week when we have more time.
+
+We can return to this later - I can remind you if you want.
