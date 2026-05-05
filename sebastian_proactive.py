@@ -588,7 +588,11 @@ async def send_to_ollama(prompt):
 # ==================== ASYNCIO MONITORS ====================
 
 async def proactive_monitor():
-    """Monitors proactive schedule - Sebastian's heartbeat (dynamic interval)."""
+    """Monitors proactive schedule - Sebastian's heartbeat (dynamic interval).
+    
+    Single Responsibility: Only handles sleep scheduling.
+    Checks BOTH proactive_schedule.json AND appointments.json for next contact.
+    """
     first_run = True
     while True:
         if first_run:
@@ -597,10 +601,11 @@ async def proactive_monitor():
             continue
         
         # Check PROACTIVE_MODE at RUNTIME
-        if PROACTIVE_MODE:
+        proactive_mode_env = os.getenv("PROACTIVE_MODE", "true").lower() == "true"
+        if proactive_mode_env:
             await check_proactive()
         
-        # Dynamic sleep: check BOTH sources for next contact
+        # Sleep until next contact (check both sources)
         try:
             from proactive_scheduler import get_next_future_proactive_contact
             next_proactive, seconds_proactive = get_next_future_proactive_contact()
