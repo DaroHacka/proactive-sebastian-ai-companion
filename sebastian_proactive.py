@@ -329,8 +329,29 @@ def get_random_appointment_proposal():
     else:
         # Add time in parentheses
         return f"{phrase} (around {time_str})"
-
-
+ 
+def get_random_appointment_excuse():
+    """Load random excuse from appointment-triggered-excuses.txt.
+    
+    Skips headers (###), comments (#), and empty lines.
+    Returns a random excuse string.
+    """
+    try:
+        with open("library/appointment-triggered-excuses.txt", "r") as f:
+            lines = []
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("###") or line.startswith("#"):
+                    continue
+                lines.append(line)
+        
+        if lines:
+            return random.choice(lines)
+    except Exception as e:
+        logger.error(f"Error reading appointment-triggered-excuses.txt: {e}")
+    
+    return "I'm sorry I wasn't there when I said I would be."
+ 
 def create_appointment_from_commitment(appointment_data, due_iso, user_msg=""):
     """Create an appointment entry from parsed commitment data.
     
@@ -662,16 +683,62 @@ async def check_proactive():
     # Check proactive_schedule.json
     contacts = get_all_due_proactive_contacts()
     
-    # Also check appointments.json for due appointments
+    # Separate overdue appointments (missed because program was offline)
+    overdue_appts = []
+    future_contacts = []
+    
     if os.path.exists(APPOINTMENTS_FILE):
         with open(APPOINTMENTS_FILE) as fp:
             data = json.load(fp)
-            now = datetime.now()
+        now = datetime.now()
+        for appt in data.get("appointments", []):
+            if appt.get("status") == "pending":
+                due = datetime.fromisoformat(appt["due"])
+                if due <= now:
+                    overdue_appts.append(appt)
+                else:
+                    future_contacts.append(appt)  # Keep future ones
+    
+    # Add future appointments back to contacts
+    contacts.extend(future_contacts)
+    
+    # Handle overdue appointments (missed because program was offline)
+    if overdue_appts:
+        count = len(overdue_appts)
+        print(f"\n[Skipped {count} overdue appointment(s) - program was offline]")
+        
+        # Mark all as "skipped" in appointments.json
+        try:
+            with open(APPOINTMENTS_FILE, 'r') as fp:
+                data = json.load(fp)
+            
+            skipped_ids = set(a['id'] for a in overdue_appts)
             for appt in data.get("appointments", []):
-                if appt.get("status") == "pending":
-                    due = datetime.fromisoformat(appt["due"])
-                    if due <= now:
-                        contacts.append(appt)
+                if appt.get("id") in skipped_ids:
+                    appt["status"] = "skipped"
+                    appt["skipped_at"] = datetime.now().isoformat()
+            
+            with open(APPOINTMENTS_FILE, 'w') as fp:
+                json.dump(data, fp, indent=2)
+            print(f"[{count} appointments marked as skipped]")
+        except Exception as e:
+            logger.error(f"Error updating skipped appointments: {e}")
+        
+        # Send SINGLE sorry message from excuses library
+        excuse = get_random_appointment_excuse()
+        hour = datetime.now().hour
+        
+        context = f"Activity: apologizing for missed appointments. {excuse}"
+        prompt = build_combinatorial_prompt(context_str=context, hour=hour, appointment_mode=True)
+        save_prompt_to_log(prompt, "appointment_excuse")
+        
+        response = await send_to_ollama(prompt)
+        print(f"\nSebastian: {response}")
+        # No parse_and_schedule() - it's just an apology
+        
+        # Don't process overdue individually - remove from contacts
+        overdue_ids = set(a['id'] for a in overdue_appts)
+        contacts = [c for c in contacts if c.get('id') not in overdue_ids]
     
     for contact in contacts:
         hour = datetime.now().hour
@@ -1097,6 +1164,9 @@ async def async_main():
     _, sparse, norm_sched, warn_sched = validate_schedule_percentages()
     if warn_sched:
         logger.warning(f"CONFIG: {warn_sched}")
+
+    # Initialize proactive schedule if needed
+    initialize_proactive_schedule()
 
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
