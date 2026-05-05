@@ -117,7 +117,6 @@ from proactive_scheduler import (
     get_next_proactive_contact,
     get_all_due_proactive_contacts,
     complete_proactive_contact,
-    get_proactive_status,
     load_vibe_library,
     get_random_vibe,
     build_vibe_prompt,
