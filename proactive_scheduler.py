@@ -230,3 +230,11 @@ def complete_proactive_contact(contact_id):
         return True
         
     return False
+
+
+def load_proactive_schedule():
+    """Load existing proactive schedule."""
+    if os.path.exists(PROACTIVE_SCHEDULE_FILE):
+        with open(PROACTIVE_SCHEDULE_FILE, "r") as f:
+            return json.load(f)
+    return None
