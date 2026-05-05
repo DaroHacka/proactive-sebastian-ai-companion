@@ -1,6 +1,6 @@
 # Sebastian - Proactive AI Companion
 
-Mini Guide — Using Proactive Sebastian AI Companion
+Mini Guide — Using Proactive Sebastian AI Companion  
 Hello, and welcome to Proactive Sebastian AI Companion — a temporary name for a very non‑temporary idea.
 The name Sebastian is inspired by J.F. Sebastian from Blade Runner, the gentle genetic designer:
 
@@ -16,7 +16,7 @@ he interprets them, takes inspiration, and performs them like an actor reading a
 To use Proactive Sebastian, you need:
 
 - Ollama installed
-- phi4 and/or gemma2:4b pulled
+- phi4:latest and/or gemma4:26b pulled
 - Sebastian installed (see repository instructions)
 
 Once launched, Sebastian automatically generates a proactive monthly schedule.
@@ -137,7 +137,7 @@ Sebastian isn't just a tool — he's a framework for building AI companions with
 You can rename him, reshape him, rewrite his libraries, and tune his behavior until he feels like your companion.
 
 This project is playful, experimental, and alive.
-I hope you enjoy exploring it — and if you do, please support the channel.
+I hope you enjoy exploring it — and if you do, please support my channel.
 
 ---
 
