@@ -680,15 +680,57 @@ def get_next_appointment_due():
     return None, None
 
 
+async def handle_startup_overdue():
+    """Handle overdue appointments missed while program was offline. Called ONCE at startup."""
+    if not os.path.exists(APPOINTMENTS_FILE):
+        return
+    
+    with open(APPOINTMENTS_FILE) as fp:
+        data = json.load(fp)
+    
+    now = datetime.now()
+    overdue_appts = [
+        appt for appt in data.get("appointments", [])
+        if appt.get("status") == "pending" 
+        and datetime.fromisoformat(appt["due"]) <= now
+    ]
+    
+    if not overdue_appts:
+        return
+    
+    count = len(overdue_appts)
+    print(f"\n[Skipped {count} overdue appointment(s) - program was offline]")
+    
+    # Mark all as "skipped" in appointments.json
+    skipped_ids = set(a['id'] for a in overdue_appts)
+    for appt in data.get("appointments", []):
+        if appt.get("id") in skipped_ids:
+            appt["status"] = "skipped"
+            appt["skipped_at"] = datetime.now().isoformat()
+    
+    with open(APPOINTMENTS_FILE, 'w') as fp:
+        json.dump(data, fp, indent=2)
+    print(f"[{count} appointments marked as skipped]")
+    
+    # Send SINGLE sorry message from excuses library
+    excuse = get_random_appointment_excuse()
+    hour = datetime.now().hour
+    
+    context = f"Activity: apologizing for missed appointments. {excuse}"
+    prompt = build_combinatorial_prompt(context_str=context, hour=hour, appointment_mode=True)
+    save_prompt_to_log(prompt, "appointment_excuse")
+    
+    response = await send_to_ollama(prompt)
+    print(f"\nSebastian: {response}")
+    # No parse_and_schedule() - it's just an apology
+
+
 async def check_proactive():
     """Check and trigger ALL contacts that are due."""
     # Check proactive_schedule.json
     contacts = get_all_due_proactive_contacts()
     
-    # Separate overdue appointments (missed because program was offline)
-    overdue_appts = []
-    future_contacts = []
-    
+    # Check appointments.json for pending appointments (NOT overdue - those handled at startup)
     if os.path.exists(APPOINTMENTS_FILE):
         with open(APPOINTMENTS_FILE) as fp:
             data = json.load(fp)
@@ -697,50 +739,8 @@ async def check_proactive():
             if appt.get("status") == "pending":
                 due = datetime.fromisoformat(appt["due"])
                 if due <= now:
-                    overdue_appts.append(appt)
-                else:
-                    future_contacts.append(appt)  # Keep future ones
-    
-    # Add future appointments back to contacts
-    contacts.extend(future_contacts)
-    
-    # Handle overdue appointments (missed because program was offline)
-    if overdue_appts:
-        count = len(overdue_appts)
-        print(f"\n[Skipped {count} overdue appointment(s) - program was offline]")
-        
-        # Mark all as "skipped" in appointments.json
-        try:
-            with open(APPOINTMENTS_FILE, 'r') as fp:
-                data = json.load(fp)
-            
-            skipped_ids = set(a['id'] for a in overdue_appts)
-            for appt in data.get("appointments", []):
-                if appt.get("id") in skipped_ids:
-                    appt["status"] = "skipped"
-                    appt["skipped_at"] = datetime.now().isoformat()
-            
-            with open(APPOINTMENTS_FILE, 'w') as fp:
-                json.dump(data, fp, indent=2)
-            print(f"[{count} appointments marked as skipped]")
-        except Exception as e:
-            logger.error(f"Error updating skipped appointments: {e}")
-        
-        # Send SINGLE sorry message from excuses library
-        excuse = get_random_appointment_excuse()
-        hour = datetime.now().hour
-        
-        context = f"Activity: apologizing for missed appointments. {excuse}"
-        prompt = build_combinatorial_prompt(context_str=context, hour=hour, appointment_mode=True)
-        save_prompt_to_log(prompt, "appointment_excuse")
-        
-        response = await send_to_ollama(prompt)
-        print(f"\nSebastian: {response}")
-        # No parse_and_schedule() - it's just an apology
-        
-        # Don't process overdue individually - remove from contacts
-        overdue_ids = set(a['id'] for a in overdue_appts)
-        contacts = [c for c in contacts if c.get('id') not in overdue_ids]
+                    # Only add if not already skipped (startup handled those)
+                    contacts.append(appt)
     
     for contact in contacts:
         hour = datetime.now().hour
@@ -868,7 +868,7 @@ async def user_input_loop():
                         if recent:
                             context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
                     
-                    prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+                    prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo)
                     save_prompt_to_log(prompt, "manual")
                     
                     response = await send_to_ollama(prompt)
@@ -1169,6 +1169,9 @@ async def async_main():
 
     # Initialize proactive schedule if needed
     initialize_proactive_schedule()
+
+    # Handle overdue appointments from when program was offline (run ONCE at startup)
+    await handle_startup_overdue()
 
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
