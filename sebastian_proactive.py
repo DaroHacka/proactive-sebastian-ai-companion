@@ -818,8 +818,7 @@ async def check_proactive():
         # Also mark proactive_schedule.json contacts as completed
         elif not is_appointment and 'id' in contact:
             try:
-                from proactive_scheduler import mark_contact_completed
-                mark_contact_completed(contact['id'])
+                complete_proactive_contact(contact['id'])
                 print(f"[Proactive contact {contact['id']} marked as completed]")
             except Exception as e:
                 logger.error(f"Error updating proactive contact status: {e}")
