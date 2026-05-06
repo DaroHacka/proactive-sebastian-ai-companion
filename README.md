@@ -129,6 +129,52 @@ Fill it with:
 
 He'll use it to spark conversations.
 
+### Library Instructions (New Feature)
+You can now add instructions directly in your library files that Sebastian will follow when using that library.
+
+**What can you create?**
+Any list you want:
+- Books: `1984 George Orwell` or `George Orwell 1984`
+- Movies: `The Matrix 1999` or `1999 The Matrix`
+- Music: `Bohemian Rhapsody Queen`
+- Recipes, quotes, games, websites - anything!
+
+**How to add instructions:**
+
+Create or edit a library file `library-X-name.txt`:
+
+```
+# Your list items (simple format, no quotes needed)
+1984 George Orwell
+Dune Frank Herbert
+The Great Gatsby F. Scott Fitzgerald
+
+# Instruction for Sebastian (optional)
+# Use [user] to reference the user's name (auto-replaced)
+prompt = "Mention this item to [user] and ask what they think about it."
+
+# OR use random prompts (Sebastian picks one randomly)
+random_prompts = [
+    "Ask [user] a question about this item",
+    "Ask [user] if they've read this",
+    "Ask [user] what genre they think this is",
+]
+```
+
+**How it works:**
+1. Sebastian loads your library and reads the instruction
+2. When he uses that library, the instruction is added to his AI prompt
+3. He follows the instruction naturally in his response
+4. If you use `random_prompts`, he randomly picks one each time
+
+**Notes:**
+- Instructions are optional - libraries without them still work as before
+- Use `[user]` in your instructions - it gets replaced with your name from `config.toml`
+- Data lines can be any format (no quotes required)
+- Only the Python code format (`prompt = ...` or `random_prompts = [...]`) triggers the instruction feature
+
+See `library/SAMPLE-new_library.txt` for a complete example.
+
 ### Model parameters
 You can tweak Ollama settings in `ollama_params.toml`.
 
