@@ -8,19 +8,47 @@
 ###    - Lines starting with # (one or more #) are IGNORED
 ###    - Each remaining line is a valid entry
 ###
-### 3. Example for a "books" library:
+### 3. NEW FEATURE: Python code format for instructions
+###    - Add instruction that Sebastian will follow when using this library
+###    - Use: prompt = "Your instruction here (use [user] for user name)"
+###    - OR use random prompts: random_prompts = ["Prompt 1", "Prompt 2", ...]
+###    - These instructions are added to Sebastian's prompt automatically
+###
+### 4. Example for a "books" library WITH instruction:
 
-[BOOK: THE_GREAT_GATSBY],"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
-[BOOK: 1984],"1984" by George Orwell - Dystopian surveillance state.
-[BOOK: DUNE],"Dune" by Frank Herbert - Desert planet politics and spice.
+# Book entries (data lines)
+"1984" by George Orwell - Dystopian surveillance state.
+"Dune" by Frank Herbert - Desert planet politics and spice.
+"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
+
+# Instruction for Sebastian (optional)
+# Use [user] to reference the user's name (auto-replaced)
+prompt = "Mention this book to [user] and ask what they think about it."
+
+# OR use random prompts (Sebastian will pick one randomly)
+random_prompts = [
+    "Ask [user] a question about this book",
+    "Ask [user] if they've read this book",
+    "Ask [user] what genre they think this book is",
+]
 
 ###
-### 4. To use custom loading logic:
+### 5. Example WITHOUT instruction (just data, old format):
+###    (Still works! Instruction is optional)
+###
+### [BOOK: THE_GREAT_GATSBY],"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
+### [BOOK: 1984],"1984" by George Orwell - Dystopian surveillance state.
+### [BOOK: DUNE],"Dune" by Frank Herbert - Desert planet politics and spice.
+###
+### 6. To use custom loading logic:
 ###    - Create a Python function in a manager file
 ###    - Register in library_manager.py LIBRARIES dict
 ###    - OR just let the default loader pick random lines!
 ###
-### 5. Auto-discovery rules:
+### 7. Auto-discovery rules:
 ###    - File must match: library-X-name.txt (X = single letter)
 ###    - Multiple files with same X → grouped as ONE library
 ###    - Delete file → library auto-removed on restart
+###    - Instruction format is auto-detected (old vs new)
+
+(End of file)

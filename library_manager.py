@@ -66,14 +66,8 @@ def discover_new_libraries(library_dir="library"):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         library_dir = os.path.join(base_dir, library_dir)
     
-    print(f"[DEBUG] library_dir: {library_dir}")
-    print(f"[DEBUG] Absolute path: {os.path.abspath(library_dir)}")
-    print(f"[DEBUG] Exists: {os.path.exists(library_dir)}")
-    
     if not os.path.exists(library_dir):
         return discovered
-    
-    print(f"[DEBUG] Files in dir: {sorted(os.listdir(library_dir))}")
     
     pattern = r"library-([a-z])-(.+)\.txt$"
     
@@ -84,8 +78,6 @@ def discover_new_libraries(library_dir="library"):
             name = match.group(2)     # "books"
             full_path = os.path.join(library_dir, fname)
             
-            print(f"[DEBUG] Matched: {fname} -> letter={letter}, name={name}")
-            
             if letter not in discovered:
                 discovered[letter] = {
                     "files": [],
@@ -95,7 +87,6 @@ def discover_new_libraries(library_dir="library"):
                 }
             discovered[letter]["files"].append(full_path)
     
-    print(f"[DEBUG] Discovered libraries: {list(discovered.keys())}")
     return discovered
 
 
@@ -174,7 +165,138 @@ def update_libraries_from_discovery():
         print(f"[Auto-discovered library {letter}: weight={weight}, enabled={enabled}]")
 
 
-def default_loader(file_paths):
+def parse_library_content(file_path):
+    """Parse library file and extract instructions + data.
+    
+    Supports Python code format:
+        prompt = "single instruction"  # Single instruction
+        random_prompts = [...]   # List of random prompts
+    
+    Returns dict with:
+        - "data": list of data lines (for random selection)
+        - "instruction": single prompt value (or None)
+        - "random_prompts": list of random prompt instructions
+    """
+    data_lines = []
+    instruction = None
+    random_prompts = []
+    in_list_block = False
+    list_lines = []
+    
+    try:
+        with open(file_path, "r") as f:
+            lines = f.readlines()
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            # Skip empty lines and comments
+            if not line or line.startswith("#"):
+                i += 1
+                continue
+            
+            # Check for Python assignment: prompt = "..."
+            if line.startswith("prompt ="):
+                # Extract string value
+                val = line[8:].strip()
+                if val.startswith('"') or val.startswith("'"):
+                    # Remove quotes
+                    if val.endswith('"') or val.endswith("'"):
+                        instruction = val[1:-1]
+                    else:
+                        instruction = val[1:]
+                i += 1
+                continue
+            
+            # Check for Python assignment: random_prompts = [...]
+            if line.startswith("random_prompts ="):
+                in_list_block = True
+                list_lines = []
+                
+                # Get content after = 
+                val = line[16:].strip()
+                if val.startswith('['):
+                    # Might be single line: random_prompts = ["a", "b"]
+                    if val.endswith(']'):
+                        # Single line list
+                        list_str = val[1:-1]  # Remove [ and ]
+                        # Parse items
+                        for item in list_str.split(','):
+                            item = item.strip()
+                            if item.startswith('"') or item.startswith("'"):
+                                item = item[1:]
+                            if item.endswith('"') or item.endswith("'"):
+                                item = item[:-1]
+                            if item.endswith(','):
+                                item = item[:-1]
+                            if item:
+                                random_prompts.append(item)
+                        in_list_block = False
+                i += 1
+                continue
+            
+            # Check for end of multi-line list
+            if line == "]" and in_list_block:
+                in_list_block = False
+                # Process collected lines
+                for item in list_lines:
+                    item = item.strip()
+                    if item.startswith("-"):
+                        item = item[1:].strip()  # Remove "-"
+                    # Remove surrounding quotes (handle cases like "text", or "text")
+                    if len(item) >= 2:
+                        # Check for matching quotes at start and end
+                        if (item.startswith('"') and item.endswith('"')) or \
+                           (item.startswith("'") and item.endswith("'")):
+                            item = item[1:-1]
+                        # Handle case where item ends with quote + comma: "text",
+                        elif item.startswith('"') and item.endswith('",'):
+                            item = item[1:-2]  # Remove ", from end
+                        elif item.startswith("'") and item.endswith("',"):
+                            item = item[1:-2]  # Remove ', from end
+                    if item.endswith(','):
+                        item = item[:-1]
+                    if item:
+                        random_prompts.append(item)
+                list_lines = []
+                i += 1
+                continue
+            
+            # Inside multi-line list
+            if in_list_block:
+                list_lines.append(lines[i])  # Keep original with newline
+                i += 1
+                continue
+            
+            # Regular data line (clean it)
+            line = lines[i].strip()
+            # Remove matched quotes from start and end of line
+            # e.g., "item" - description -> item" - description (wrong)
+            # e.g., "item - description" -> item - description (right)
+            if line.startswith('"') and '"' in line[1:]:
+                # Find matching end quote
+                end_quote = line.rfind('"')
+                if end_quote > 0:
+                    line = line[1:end_quote] + line[end_quote+1:]
+            elif line.startswith("'") and "'" in line[1:]:
+                end_quote = line.rfind("'")
+                if end_quote > 0:
+                    line = line[1:end_quote] + line[end_quote+1:]
+            data_lines.append(line)
+            i += 1
+            
+    except Exception as e:
+        print(f"[Parse error in {file_path}: {e}]")
+    
+    return {
+        "data": data_lines,
+        "instruction": instruction,
+        "random_prompts": random_prompts,
+    }
+
+
+def default_loader(file_paths, lib_key=None):
     """Default loader for auto-discovered libraries.
     
     Rules:
@@ -182,9 +304,11 @@ def default_loader(file_paths):
     - Skip empty lines
     - Each line is a valid entry
     - If multiple files: pick random file first, then random line
+    - Extracts [prompt]: and [random][prompt]: tags if present
     
     Args:
         file_paths: string (single file) or list of strings (multiple files)
+        lib_key: library key (to store instructions in LIBRARIES)
     """
     import random
     
@@ -197,17 +321,22 @@ def default_loader(file_paths):
     # Pick random file if multiple
     chosen_file = random.choice(files)
     
-    try:
-        with open(chosen_file, "r") as f:
-            lines = [
-                line.strip() 
-                for line in f 
-                if line.strip() and not line.strip().startswith("#")
-            ]
-        if lines:
-            return random.choice(lines)
-    except Exception as e:
-        print(f"[Loader error in {chosen_file}: {e}]")
+    # Parse the file (extract instructions + data)
+    parsed = parse_library_content(chosen_file)
+    
+    # Store instructions in LIBRARIES if lib_key provided
+    if lib_key and lib_key in LIBRARIES:
+        if parsed["instruction"]:
+            LIBRARIES[lib_key]["instruction"] = parsed["instruction"]
+        if parsed["random_prompts"]:
+            LIBRARIES[lib_key]["random_prompts"] = parsed["random_prompts"]
+    
+    # Return random data line (cleaned)
+    if parsed["data"]:
+        data = random.choice(parsed["data"])
+        # Clean up: strip quotes and newlines
+        data = data.strip().strip('"').strip("'")
+        return data
     
     return None
 
@@ -242,7 +371,7 @@ def get_loader(lib_key):
     # Auto-discovered library with no custom loader: use default loader
     if lib.get("auto_discovered"):
         files = lib.get("file", [])
-        return lambda: default_loader(files)
+        return lambda: default_loader(files, lib_key)
     
     # No loader found
     return None

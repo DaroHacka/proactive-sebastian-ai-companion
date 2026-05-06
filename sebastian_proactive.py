@@ -623,7 +623,29 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
                 if loader:
                     result = loader()
                     if result:
-                        task_parts.append(f'Also: "{result}"')
+                        # Clean up result: strip quotes and newlines
+                        result_clean = result.strip().strip('"').strip("'")
+                        task_parts.append(f'Also: {result_clean}')
+                
+                # Add instructions from [prompt]: and [random][prompt]:
+                lib_info = LIBRARIES[lib_key]
+                
+                # Get user name
+                try:
+                    from config.config_manager import get_user_name
+                    user_name = get_user_name()
+                except:
+                    user_name = "Elias"
+                
+                # Add instruction: prefer random_prompts over single instruction
+                import random
+                if lib_info.get("random_prompts"):
+                    prompt = random.choice(lib_info["random_prompts"])
+                    prompt = prompt.replace("[user]", user_name)
+                    task_parts.append(f"Instruction: {prompt}")
+                elif lib_info.get("instruction"):
+                    instruction = lib_info["instruction"].replace("[user]", user_name)
+                    task_parts.append(f"Instruction: {instruction}")
         
         # Add commitment guidance if library f was used
         if has_lib_f:
@@ -634,7 +656,16 @@ def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=Non
     if not task_parts:
         task_parts.append(f"Context: {context_str}")
     
-    task_instructions = ". ".join(task_parts)
+    # Join task_parts, avoiding double periods
+    cleaned_parts = []
+    for part in task_parts:
+        part = part.strip()
+        # Remove trailing periods for joining
+        while part.endswith('.'):
+            part = part[:-1].strip()
+        cleaned_parts.append(part)
+    
+    task_instructions = ". ".join(cleaned_parts)
     
     # Replace {recent_context} placeholder if present in context
     recent_context = ""
