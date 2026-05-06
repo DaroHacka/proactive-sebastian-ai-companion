@@ -1318,15 +1318,18 @@ async def async_main():
 
     # Initialize proactive schedule if needed
     initialize_proactive_schedule()
-
-    # Check if there are overdue appointments before waiting
-    overdue_count = check_overdue_count()
-    if overdue_count > 0:
-        print(f"[Waiting 10s before processing {overdue_count} overdue appointment(s)...]")
-        await asyncio.sleep(10)
-        # Handle overdue appointments from when program was offline (run ONCE at startup)
-        await handle_startup_overdue()
-
+    
+    # Schedule non-blocking overdue check (100 seconds delay)
+    async def delayed_overdue_check():
+        """Process overdue appointments after 100 seconds (non-blocking)."""
+        await asyncio.sleep(100)
+        overdue_count = check_overdue_count()
+        if overdue_count > 0:
+            print(f"\n[Processing {overdue_count} overdue appointment(s) after 100s delay...]")
+            await handle_startup_overdue()
+    
+    asyncio.create_task(delayed_overdue_check())
+    
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
     print("=" * 50)
