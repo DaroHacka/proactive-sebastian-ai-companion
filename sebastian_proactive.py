@@ -67,9 +67,14 @@ MEMORY_DIR = "memory"
 PROMPT_LOG_DIR = "prompt-to-AI-logs"
 STATE_FILE = "state.json"
 LAST_INTERACTION_FILE = "last_interaction.json"
-CONVERSATION_DIR = "conversation"
-if not os.path.exists(CONVERSATION_DIR):
-    os.makedirs(CONVERSATION_DIR)
+# ==================== CONVERSATION LOGGING ====================
+CONVERSATION_LOGS_DIR = "conversation_logs"
+CONVERSATION_LOGS_SESSION_DIR = os.path.join(CONVERSATION_LOGS_DIR, "logs")
+
+_current_session_log = None
+_current_saved_file = None  # Track the currently saved file (for `save` updates)
+_session_message_count = 0
+_last_ai_response = None  # Track last AI response for auto-title
 APPOINTMENTS_FILE = "appointments/appointments.json"
 MAX_MEMORY_ENTRIES = int(os.getenv("MAX_MEMORY_ENTRIES", "50"))
 ARCHIVE_THRESHOLD = int(os.getenv("ARCHIVE_THRESHOLD", "30"))
@@ -425,6 +430,110 @@ def load_conversations():
     return []
 
 
+# ==================== CONVERSATION LOGGING ====================
+
+def get_current_session_log_path():
+    """Get or create current session log file (in conversation_logs/logs/)."""
+    global _current_session_log
+    
+    if _current_session_log is None:
+        # Create directories if needed
+        os.makedirs(CONVERSATION_LOGS_SESSION_DIR, exist_ok=True)
+        
+        # Create timestamped session log
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        _current_session_log = os.path.join(CONVERSATION_LOGS_SESSION_DIR, f"{timestamp}_session.txt")
+        
+        # Don't create file yet - wait until first message
+    
+    return _current_session_log
+
+
+def log_message_to_session(role, message):
+    """Append a message to the current session log in real-time (txt format)."""
+    global _session_message_count
+    
+    if not message or not message.strip():
+        return  # Don't log empty messages
+    
+    try:
+        log_file = get_current_session_log_path()
+        
+        # Create file with header if it doesn't exist
+        if not os.path.exists(log_file):
+            with open(log_file, "w") as f:
+                f.write(f"Session started: {datetime.now().isoformat()}\n")
+                f.write("=" * 50 + "\n\n")
+        
+        # Append message
+        with open(log_file, "a") as f:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"=== {role.upper()} [{timestamp}] ===\n")
+            f.write(f"{message}\n\n")
+        
+        _session_message_count += 1
+    except Exception as e:
+        logger.error(f"Error logging message to session: {e}")
+
+
+def reset_session_log():
+    """Reset session log (call on program start)."""
+    global _current_session_log, _session_message_count, _current_saved_file
+    _current_session_log = None
+    _session_message_count = 0
+    _current_saved_file = None
+
+
+def generate_title_from_response(response, max_words=10):
+    """Extract first N words from response for use as filename."""
+    if not response:
+        return "conversation"
+    
+    # Clean up: remove emojis, special chars
+    import re
+    # Remove content in parentheses/brackets
+    cleaned = re.sub(r'\([^)]*\)', '', response)
+    cleaned = re.sub(r'\[[^]]*\]', '', cleaned)
+    
+    # Get first N words
+    words = cleaned.split()
+    title_words = []
+    for word in words[:max_words]:
+        # Keep only alphanumeric, spaces, hyphens, underscores
+        cleaned_word = re.sub(r'[^a-zA-Z0-9_\\-]', '', word)
+        if cleaned_word:
+            title_words.append(cleaned_word)
+    
+    title = "_".join(title_words)
+    
+    # Limit length (max 100 chars for portability)
+    if len(title) > 80:
+        title = title[:77] + "..."
+    
+    return title if title else "conversation"
+
+
+def get_saved_file_path(title=None, response=None):
+    """Get path for saved conversation in conversation_logs/ (txt format)."""
+    os.makedirs(CONVERSATION_LOGS_DIR, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    if title:
+        # Clean title for filename
+        import re
+        title_clean = re.sub(r'[^a-zA-Z0-9_\\-]', '_', title)
+        title_clean = re.sub(r'_+', '_', title_clean).strip('_')
+        filename = f"{timestamp}_{title_clean}.txt"
+    elif response:
+        auto_title = generate_title_from_response(response)
+        filename = f"{timestamp}_{auto_title}.txt"
+    else:
+        filename = f"{timestamp}_conversation.txt"
+    
+    return os.path.join(CONVERSATION_LOGS_DIR, filename)
+
+
 def build_combinatorial_prompt(context_str=None, hour=None, combo=None, mode=None, appointment_mode=False):
     if hour is None:
         hour = datetime.now().hour
@@ -723,114 +832,79 @@ async def handle_startup_overdue():
     
     response = await send_to_ollama(prompt)
     print(f"\nSebastian: {response}")
-    # No parse_and_schedule() - it's just an apology
+    
+    # Log AI message immediately
+    log_message_to_session("assistant", response)
+    
+    # Track last response for save auto-title
+    _last_ai_response = response
+    
+    # Parse response
+    await parse_and_schedule(response, "trigger")
+    return
+
+
+def check_overdue_count():
+    """Check count of overdue appointments without processing them."""
+    if not os.path.exists(APPOINTMENTS_FILE):
+        return 0
+    
+    try:
+        with open(APPOINTMENTS_FILE) as fp:
+            data = json.load(fp)
+        
+        now = datetime.now()
+        overdue_count = sum(
+            1 for appt in data.get("appointments", [])
+            if appt.get("status") == "pending" 
+            and datetime.fromisoformat(appt["due"]) <= now
+        )
+        return overdue_count
+    except Exception as e:
+        logger.error(f"Error checking overdue count: {e}")
+        return 0
 
 
 async def check_proactive():
-    """Check and trigger ALL contacts that are due."""
-    # Check proactive_schedule.json
-    contacts = get_all_due_proactive_contacts()
-    
-    # Check appointments.json for pending appointments (NOT overdue - those handled at startup)
-    if os.path.exists(APPOINTMENTS_FILE):
-        with open(APPOINTMENTS_FILE) as fp:
-            data = json.load(fp)
-        now = datetime.now()
-        for appt in data.get("appointments", []):
-            if appt.get("status") == "pending":
-                due = datetime.fromisoformat(appt["due"])
-                if due <= now:
-                    # Only add if not already skipped (startup handled those)
-                    contacts.append(appt)
-    
-    for contact in contacts:
-        hour = datetime.now().hour
+    """Check and handle due proactive contacts from proactive_schedule.json."""
+    try:
+        from proactive_scheduler import get_all_due_proactive_contacts
+        due_contacts = get_all_due_proactive_contacts()
         
-        # Check if this is an appointment (from appointments.json)
-        is_appointment = contact.get("type") == "commitment" or contact.get("source") in ["user_request", "ai_proposal", "library_f"]
+        if not due_contacts:
+            return
         
-        if is_appointment:
-            # APPOINTMENT MODE: No combo, use appointment-triggered-openers.txt ONLY
-            print(f"\n[Appointment Due: {contact.get('description', 'check-in')}]")
-            
-            # Load appointment-triggered opener
-            relative_time = "tomorrow" if "tomorrow" in contact.get("description", "").lower() else "today"
-            opener = get_random_appointment_opener(relative_time)
-            
-            context = f"Activity: {contact.get('description', 'Scheduled check-in')}. {opener if opener else ''}"
-            
-            # Build prompt with appointment_mode=True (cleaner than combo=None)
-            prompt = build_combinatorial_prompt(context_str=context, hour=hour, appointment_mode=True)
-            save_prompt_to_log(prompt, "appointment_due")
-            
-        else:
-            # Normal proactive contact - use combo
-            combo = select_combination()
-            intent = get_random_intent() if "a" in combo else None
-            cue_code, cue_desc, _ = get_random_cue() if "b" in combo else (None, None, None)
-            vibe = get_random_vibe(hour) if "c" in combo else None
-            
-            # Show what was picked
-            print(f"\n[Proactive: {contact['activity']}]")
-            print(f"Combination: {combo}")
-            if intent:
-                print(f" Intent: {intent[:60]}...")
-            if cue_code:
-                print(f" Cue: {cue_code}")
-            if vibe:
-                library = "day" if hour >= 6 else "night"
-                print(f" Vibe: [{vibe['name']}] (hour={hour:02d}, {library} library)")
-            
-            # Build context
-            context = "Activity: " + contact.get("activity", "chat")
-            
-            if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
-                recent = load_conversations()
-                if recent:
-                    context = "\n".join([f"{m.get('user_message','')}: {m.get('ai_message','')}" for m in recent[-3:]])
-            
+        for contact in due_contacts:
+            # Build prompt
+            hour = datetime.now().hour
+            context = f"Activity: proactive check-in"
             prompt = build_combinatorial_prompt(context_str=context, hour=hour)
-            save_prompt_to_log(prompt, "scheduled")
-        
-        response = await send_to_ollama(prompt)
-        print(f"\nSebastian: {response}")
-        
-        # Mark appointment as completed BEFORE parsing new ones
-        if is_appointment and 'id' in contact:
-            try:
-                with open(APPOINTMENTS_FILE, 'r') as fp:
-                    data = json.load(fp)
-                
-                updated = False
-                for appt in data.get("appointments", []):
-                    if appt.get("id") == contact['id']:
-                        appt["status"] = "completed"
-                        appt["completed_at"] = datetime.now().isoformat()
-                        updated = True
-                        break
-                
-                if updated:
-                    with open(APPOINTMENTS_FILE, 'w') as fp:
-                        json.dump(data, fp, indent=2)
-                    print(f"[Appointment {contact['id']} marked as completed]")
-            except Exception as e:
-                logger.error(f"Error updating appointment status: {e}")
-        
-        # Also mark proactive_schedule.json contacts as completed
-        elif not is_appointment and 'id' in contact:
-            try:
+            save_prompt_to_log(prompt, "proactive")
+            
+            # Send to AI
+            response = await send_to_ollama(prompt)
+            print(f"\nSebastian: {response}")
+            
+            # Log session
+            log_message_to_session("assistant", response)
+            
+            # Track for save auto-title
+            _last_ai_response = response
+            
+            # Mark completed
+            if 'id' in contact:
                 complete_proactive_contact(contact['id'])
-                print(f"[Proactive contact {contact['id']} marked as completed]")
-            except Exception as e:
-                logger.error(f"Error updating proactive contact status: {e}")
-        
-        # Parse and schedule after trigger response
-        await parse_and_schedule(response, "trigger")
-        return
+            
+            # Parse response
+            await parse_and_schedule(response, "proactive")
+            
+    except Exception as e:
+        logger.error(f"Error in check_proactive: {e}")
 
 
 async def user_input_loop():
     """Handle user input commands via stdin."""
+    global _last_ai_response
     loop = asyncio.get_event_loop()
     
     while True:
@@ -872,6 +946,7 @@ async def user_input_loop():
                     save_prompt_to_log(prompt, "manual")
                     
                     response = await send_to_ollama(prompt)
+                    log_message_to_session("assistant", response)
                     print(f"\nSebastian: {response}")
                     await parse_and_schedule(response, cmd)
                     continue
@@ -907,6 +982,7 @@ async def user_input_loop():
                                 save_prompt_to_log(prompt, f"trigger_library_{letter}")
                             
                             response = await send_to_ollama(prompt)
+                            log_message_to_session("assistant", response)
                             print(f"\nSebastian: {response}")
                             await parse_and_schedule(response, cmd)
                         else:
@@ -1056,14 +1132,42 @@ async def user_input_loop():
                     continue
             
             # ===== SAVE COMMAND =====
-            if cmd == "save":
-                    recent = load_conversations()
-                    if recent:
-                        with open("conversation_save.json", "w") as fp:
-                            json.dump(recent, fp, indent=2)
-                        print("[Conversation saved to conversation_save.json]")
-                    else:
-                        print("[No conversation to save]")
+            if cmd.startswith("save"):
+                    try:
+                        # Get title from command or auto-generate
+                        parts = cmd.split(" ", 1)
+                        title = parts[1].strip() if len(parts) > 1 else None
+                        
+                        # Get current session log
+                        session_log = get_current_session_log_path()
+                        
+                        if not os.path.exists(session_log) or _session_message_count == 0:
+                            print("[No active conversation to save]")
+                            continue
+                        
+                        # Generate filename
+                        if title:
+                            # Clean title for filename
+                            import re
+                            title_clean = re.sub(r'[^a-zA-Z0-9_\\-]', '_', title)
+                            title_clean = re.sub(r'_+', '_', title_clean).strip('_')
+                            filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{title_clean}.txt"
+                            save_file = os.path.join(CONVERSATION_LOGS_DIR, filename)
+                        else:
+                            # Auto-generate from last AI response (returns full path)
+                            save_file = get_saved_file_path(response=_last_ai_response)
+                        
+                        # Copy current session to saved location
+                        import shutil
+                        shutil.copy2(session_log, save_file)
+                        
+                        # Track the saved file for future updates
+                        global _current_saved_file
+                        _current_saved_file = save_file
+                        
+                        print(f"[Conversation saved to {save_file}]")
+                    except Exception as e:
+                        print(f"[Error saving conversation: {e}]")
                     continue
             
             # ===== MENU COMMAND =====
@@ -1087,7 +1191,7 @@ async def user_input_loop():
                     print("  memory on   - Include recent memory in prompts")
                     print("  memory off  - Exclude recent memory from prompts")
                     print("  model X     - Switch model (phi4, gemma4)")
-                    print("  save        - Save current conversation to disk")
+                    print("  save [title] - Save conversation (auto-title or optional title)")
                     print("  menu      - Show this commands menu")
                     print("  clear     - Clear screen")
                     print("  quit      - Exit")
@@ -1107,6 +1211,10 @@ async def user_input_loop():
             # ===== DEFAULT: NORMAL CHAT =====
             hour = datetime.now().hour
             context = cmd
+            
+            # Log user message immediately
+            log_message_to_session("user", cmd)
+            
             if os.getenv("MEMORY_IN_PROMPT", "false").lower() == "true":
                     recent = load_conversations()
                     if recent:
@@ -1144,14 +1252,21 @@ async def user_input_loop():
             
             response = await send_to_ollama(prompt)
             print(f"\nSebastian: {response}")
+            
+            # Log AI message immediately
+            log_message_to_session("assistant", response)
+            
+            # Track last response for save auto-title
+            _last_ai_response = response
+            
             await parse_and_schedule(response, cmd)
             
             with open(LAST_INTERACTION_FILE, "w") as f:
-                    json.dump({
-                        "user_message": cmd if not cmd.startswith("trigger") else "",
-                        "ai_message": response,
-                        "timestamp": datetime.now().isoformat()
-                    }, f, indent=2)
+                        json.dump({
+                            "user_message": cmd if not cmd.startswith("trigger") else "",
+                            "ai_message": response,
+                            "timestamp": datetime.now().isoformat()
+                        }, f, indent=2)
             
         except asyncio.CancelledError:
             raise
@@ -1167,11 +1282,19 @@ async def async_main():
     if warn_sched:
         logger.warning(f"CONFIG: {warn_sched}")
 
+    # Reset session log for new session
+    reset_session_log()
+
     # Initialize proactive schedule if needed
     initialize_proactive_schedule()
 
-    # Handle overdue appointments from when program was offline (run ONCE at startup)
-    await handle_startup_overdue()
+    # Check if there are overdue appointments before waiting
+    overdue_count = check_overdue_count()
+    if overdue_count > 0:
+        print(f"[Waiting 10s before processing {overdue_count} overdue appointment(s)...]")
+        await asyncio.sleep(10)
+        # Handle overdue appointments from when program was offline (run ONCE at startup)
+        await handle_startup_overdue()
 
     print("=" * 50)
     print("    SEBASTIAN - Proactive AI Companion (ASYNCIO)")
@@ -1196,7 +1319,7 @@ async def async_main():
     print("  memory on   - Include recent memory in prompts")
     print("  memory off  - Exclude recent memory from prompts")
     print("  model X     - Switch model (phi4, gemma4)")
-    print("  save        - Save current conversation to disk")
+    print("  save [title] - Save conversation (auto-title or optional title)")
     print("  menu      - Show this commands menu")
     print("  clear     - Clear screen")
     print("  quit      - Exit")
