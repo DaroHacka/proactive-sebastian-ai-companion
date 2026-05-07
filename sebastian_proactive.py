@@ -909,7 +909,8 @@ async def check_proactive():
             # Build prompt
             hour = datetime.now().hour
             context = f"Activity: proactive check-in"
-            prompt = build_combinatorial_prompt(context_str=context, hour=hour)
+            combo = select_combination()
+            prompt = build_combinatorial_prompt(context_str=context, hour=hour, combo=combo)
             save_prompt_to_log(prompt, "proactive")
             
             # Send to AI
