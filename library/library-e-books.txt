@@ -1,5 +1,18 @@
 # Books library - auto-discovered
-"The Great Gatsby" by F. Scott Fitzgerald - Jazz age decadence.
+# This is an example of how you should use the random prompt in any of your libraries. Create prompts according to the content of your library; these will be randomized every time your library is triggered by Sebastian. If you only need one prompt, you don’t need randomization, so you can simply use: 
+# prompt = ["Ask [user] a random question about this book"]
+
+random_prompts = [
+    "Ask [user] a random question about this book",
+    "Ask [user] what you think would be a good question based on this book",
+    "Ask the [user] a curious question about this book.",
+    "Ask whether they’ve read it or heard of it.",
+    "Ask what they think the book is about based on the title.",
+    "Ask if they know the author.",
+    "Ask if this book reminds them of another one.",
+]
+
+The Great Gatsby F. Scott Fitzgerald 
 "1984" by George Orwell - Dystopian surveillance state.
-"Dune" by Frank Herbert - Desert planet politics and spice.
-"The Hobbit" by J.R.R. Tolkien - Unexpected journey with dwarves.
+"Dune" by Frank Herbert
+The Hobbit J.R.R. Tolkien 
